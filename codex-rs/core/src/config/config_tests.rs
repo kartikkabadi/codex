@@ -6850,6 +6850,7 @@ name = "OpenAI custom"
 base_url = "https://api.openai.com/v1"
 env_key = "OPENAI_API_KEY"
 wire_api = "responses"
+protocol_id = "openai-responses"
 request_max_retries = 4            # retry failed HTTP requests
 stream_max_retries = 10            # retry dropped SSE streams
 stream_idle_timeout_ms = 300000    # 5m idle timeout
@@ -6913,6 +6914,7 @@ model_verbosity = "high"
         websocket_connect_timeout_ms: Some(15_000),
         requires_openai_auth: false,
         supports_websockets: false,
+        protocol_id: "openai-responses".to_string(),
     };
     let model_provider_map = {
         let mut model_provider_map =
