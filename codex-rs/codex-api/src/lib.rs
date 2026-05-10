@@ -1,3 +1,5 @@
+// codex-api/src/lib.rs
+
 pub(crate) mod api_bridge;
 pub(crate) mod auth;
 pub(crate) mod common;
@@ -12,6 +14,122 @@ pub(crate) mod safety_buffering;
 pub(crate) mod search;
 pub(crate) mod sse;
 pub(crate) mod telemetry;
+
+// ---------------------------------------------------------------------------
+// Re-exports from codex-wire-protocol (protocol-agnostic types)
+// ---------------------------------------------------------------------------
+pub use codex_wire_protocol::auth::AuthToken;
+pub use codex_wire_protocol::capabilities::ProtocolCapabilities;
+pub use codex_wire_protocol::error::WireError;
+pub use codex_wire_protocol::protocol::WireProtocol;
+pub use codex_wire_protocol::request::CompactRequest;
+pub use codex_wire_protocol::request::ReasoningConfig;
+pub use codex_wire_protocol::request::ReasoningEffort;
+pub use codex_wire_protocol::request::Role;
+pub use codex_wire_protocol::request::ToolChoice;
+pub use codex_wire_protocol::request::ToolSpec;
+pub use codex_wire_protocol::request::TurnItem;
+pub use codex_wire_protocol::request::TurnRequest;
+pub use codex_wire_protocol::response::CompactResponse;
+pub use codex_wire_protocol::response::ModelInfo;
+pub use codex_wire_protocol::response::TurnEvent;
+pub use codex_wire_protocol::response::TurnStream;
+pub use codex_wire_protocol::response::Usage;
+
+// ---------------------------------------------------------------------------
+// New protocol-agnostic dispatch layer
+// ---------------------------------------------------------------------------
+use std::sync::Arc;
+
+use codex_wire_protocol_anthropic::AnthropicWireProtocol;
+use codex_wire_protocol_gemini::GeminiWireProtocol;
+use codex_wire_protocol_openai::OpenAiWireProtocol;
+
+/// Thin dispatch client that holds a protocol adapter and delegates all
+/// turn-based, model-listing, and compaction operations to it.
+///
+/// This is the preferred entry-point for new code. Legacy endpoint-specific
+/// clients (`ResponsesClient`, `ModelsClient`, …) remain available for
+/// backward compatibility but are deprecated.
+pub struct ApiClient {
+    protocol: Arc<dyn WireProtocol>,
+}
+
+impl ApiClient {
+    /// Create a new `ApiClient` backed by the given protocol adapter.
+    pub fn new(protocol: Arc<dyn WireProtocol>) -> Self {
+        Self { protocol }
+    }
+
+    /// Access the underlying protocol adapter.
+    pub fn protocol(&self) -> &Arc<dyn WireProtocol> {
+        &self.protocol
+    }
+
+    /// Stream a single turn (prompt -> response).
+    pub async fn stream_turn(
+        &self,
+        request: TurnRequest,
+        auth: AuthToken,
+    ) -> Result<TurnStream, WireError> {
+        self.protocol.stream_turn(request, auth).await
+    }
+
+    /// List available models from the provider.
+    pub async fn list_models(&self, auth: AuthToken) -> Result<Vec<ModelInfo>, WireError> {
+        self.protocol.list_models(auth).await
+    }
+
+    /// Compact / summarize conversation context.
+    ///
+    /// Returns `Err(WireError::Unsupported)` when the protocol does not
+    /// implement native compaction.
+    pub async fn compact_context(
+        &self,
+        request: CompactRequest,
+        auth: AuthToken,
+    ) -> Result<CompactResponse, WireError> {
+        self.protocol.compact_context(request, auth).await
+    }
+
+    /// Query the protocol capabilities.
+    pub fn capabilities(&self) -> ProtocolCapabilities {
+        self.protocol.capabilities()
+    }
+}
+
+/// Factory that creates a concrete protocol adapter from a protocol id.
+///
+/// Supported identifiers:
+/// * `"openai-responses"` | `"openai-chat-completions"` → [`OpenAiWireProtocol`]
+/// * `"anthropic-messages"` → [`AnthropicWireProtocol`]
+/// * `"gemini"` → [`GeminiWireProtocol`]
+///
+/// Returns `Err(ApiError::UnsupportedProtocol)` for unknown identifiers.
+pub fn create_protocol(
+    protocol_id: &str,
+    base_url: String,
+) -> Result<Arc<dyn WireProtocol>, crate::error::ApiError> {
+    match protocol_id {
+        "openai-responses" | "openai-chat-completions" => {
+            let adapter = OpenAiWireProtocol::new(base_url);
+            Ok(Arc::new(adapter))
+        }
+        "anthropic-messages" => {
+            let adapter = AnthropicWireProtocol::new(base_url, String::new());
+            Ok(Arc::new(adapter))
+        }
+        "gemini" => {
+            let adapter = GeminiWireProtocol::new(base_url);
+            Ok(Arc::new(adapter))
+        }
+        _ => Err(crate::error::ApiError::UnsupportedProtocol(protocol_id.to_string())),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Backward-compatible re-exports (legacy endpoint modules)
+// ---------------------------------------------------------------------------
 
 pub use crate::requests::headers::build_session_headers;
 pub use codex_client::RequestTelemetry;
@@ -47,10 +165,19 @@ pub use crate::common::WS_REQUEST_HEADER_TRACEPARENT_CLIENT_METADATA_KEY;
 pub use crate::common::WS_REQUEST_HEADER_TRACESTATE_CLIENT_METADATA_KEY;
 pub use crate::common::create_text_param_for_request;
 pub use crate::common::response_create_client_metadata;
+
+/// **Deprecated** — OpenAI-specific responses endpoint client.
+/// Use [`ApiClient`] with an `openai-responses` protocol instead.
 pub use crate::endpoint::CompactClient;
 pub use crate::endpoint::ImagesClient;
+/// **Deprecated** — OpenAI-specific responses endpoint client.
+/// Use [`ApiClient`] with an `openai-responses` protocol instead.
 pub use crate::endpoint::MemoriesClient;
+/// **Deprecated** — OpenAI-specific responses endpoint client.
+/// Use [`ApiClient`] with an `openai-responses` protocol instead.
 pub use crate::endpoint::ModelsClient;
+/// **Deprecated** — OpenAI-specific responses endpoint client.
+/// Use [`ApiClient`] with an `openai-responses` protocol instead.
 pub use crate::endpoint::RealtimeCallClient;
 pub use crate::endpoint::RealtimeCallResponse;
 pub use crate::endpoint::RealtimeContextAppendChannel;
@@ -62,7 +189,11 @@ pub use crate::endpoint::RealtimeWebsocketClient;
 pub use crate::endpoint::RealtimeWebsocketConnection;
 pub use crate::endpoint::RealtimeWebsocketEvents;
 pub use crate::endpoint::RealtimeWebsocketWriter;
+/// **Deprecated** — OpenAI-specific responses endpoint client.
+/// Use [`ApiClient`] with an `openai-responses` protocol instead.
 pub use crate::endpoint::ResponsesClient;
+/// **Deprecated** — OpenAI-specific responses endpoint client.
+/// Use [`ApiClient`] with an `openai-responses` protocol instead.
 pub use crate::endpoint::ResponsesOptions;
 pub use crate::endpoint::ResponsesWebsocketClient;
 pub use crate::endpoint::ResponsesWebsocketClose;

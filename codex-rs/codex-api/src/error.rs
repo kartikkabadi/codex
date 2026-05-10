@@ -31,6 +31,8 @@ pub enum ApiError {
     CyberPolicy { message: String },
     #[error("server overloaded")]
     ServerOverloaded,
+    #[error("unsupported protocol: {0}")]
+    UnsupportedProtocol(String),
 }
 
 impl From<RateLimitError> for ApiError {

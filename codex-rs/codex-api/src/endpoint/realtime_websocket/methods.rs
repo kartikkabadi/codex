@@ -2015,6 +2015,7 @@ mod tests {
                 retry_transport: false,
             },
             stream_idle_timeout: Duration::from_secs(5),
+            protocol_id: "openai-responses".to_string(),
         };
         let client = RealtimeWebsocketClient::new(provider);
         let connection = client
@@ -2341,6 +2342,7 @@ mod tests {
                 retry_transport: false,
             },
             stream_idle_timeout: Duration::from_secs(5),
+            protocol_id: "openai-responses".to_string(),
         };
         let client = RealtimeWebsocketClient::new(provider);
         let connection = client
@@ -2468,6 +2470,7 @@ mod tests {
                 retry_transport: false,
             },
             stream_idle_timeout: Duration::from_secs(5),
+            protocol_id: "openai-responses".to_string(),
         };
         let client = RealtimeWebsocketClient::new(provider);
         let connection = client
@@ -2574,6 +2577,7 @@ mod tests {
                 retry_transport: false,
             },
             stream_idle_timeout: Duration::from_secs(5),
+            protocol_id: "openai-responses".to_string(),
         };
         let client = RealtimeWebsocketClient::new(provider);
         let connection = client
@@ -2666,6 +2670,7 @@ mod tests {
                 retry_transport: false,
             },
             stream_idle_timeout: Duration::from_secs(5),
+            protocol_id: "openai-responses".to_string(),
         };
         let client = RealtimeWebsocketClient::new(provider);
         let connection = client

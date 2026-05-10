@@ -47,6 +47,7 @@ pub struct Provider {
     pub headers: HeaderMap,
     pub retry: RetryConfig,
     pub stream_idle_timeout: Duration,
+    pub protocol_id: String,
 }
 
 impl Provider {
@@ -62,13 +63,18 @@ impl Provider {
         if let Some(params) = &self.query_params
             && !params.is_empty()
         {
-            let qs = params
-                .iter()
-                .map(|(k, v)| format!("{k}={v}"))
-                .collect::<Vec<_>>()
-                .join("&");
-            url.push('?');
-            url.push_str(&qs);
+            let mut parsed_url = Url::parse(&url).unwrap_or_else(|_| {
+                // Should never happen because base_url is already a valid URL,
+                // but fall back to the raw string if it does.
+                Url::parse("http://localhost").unwrap()
+            });
+            {
+                let mut pairs = parsed_url.query_pairs_mut();
+                for (k, v) in params {
+                    pairs.append_pair(k, v);
+                }
+            }
+            url = parsed_url.to_string();
         }
 
         url

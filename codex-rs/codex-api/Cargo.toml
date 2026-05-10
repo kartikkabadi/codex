@@ -14,6 +14,10 @@ codex-http-client = { workspace = true }
 codex-protocol = { workspace = true }
 codex-utils-rustls-provider = { workspace = true }
 codex-websocket-client = { workspace = true }
+codex-wire-protocol = { workspace = true }
+codex-wire-protocol-anthropic = { workspace = true }
+codex-wire-protocol-gemini = { workspace = true }
+codex-wire-protocol-openai = { workspace = true }
 futures = { workspace = true }
 http = { workspace = true }
 schemars = { workspace = true }
