@@ -1,6 +1,7 @@
 use super::cache::FileModelsCache;
 use crate::cache::ModelsCache;
 use crate::cache::ModelsCacheEntry;
+use crate::catalog::ModelCatalog;
 use crate::collaboration_mode_presets::builtin_collaboration_mode_presets;
 use crate::config::ModelsManagerConfig;
 use crate::model_info;
@@ -221,6 +222,7 @@ pub struct OpenAiModelsManager {
     cache: Option<Arc<dyn ModelsCache>>,
     endpoint_client: SharedModelsEndpointClient,
     auth_manager: Option<Arc<AuthManager>>,
+    catalog: Arc<dyn ModelCatalog>,
 }
 
 /// Static model manager backed by an authoritative in-process catalog.
@@ -236,6 +238,7 @@ impl OpenAiModelsManager {
         codex_home: PathBuf,
         endpoint_client: Arc<dyn ModelsEndpointClient>,
         auth_manager: Option<Arc<AuthManager>>,
+        catalog: Arc<dyn ModelCatalog>,
     ) -> Self {
         let cache_path = codex_home.join(MODEL_CACHE_FILE);
         Self::new_with_optional_cache(
@@ -280,6 +283,7 @@ impl OpenAiModelsManager {
             cache,
             endpoint_client,
             auth_manager,
+            catalog,
         }
     }
 }

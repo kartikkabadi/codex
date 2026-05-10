@@ -1,4 +1,6 @@
 pub mod cache;
+pub mod catalog;
+pub mod catalogs;
 pub mod collaboration_mode_presets;
 pub(crate) mod config;
 pub mod manager;
@@ -6,6 +8,7 @@ pub mod model_info;
 pub mod model_presets;
 pub mod test_support;
 
+pub use catalog::ModelCatalog;
 pub use codex_protocol::auth::AuthMode;
 pub use config::ModelsManagerConfig;
 
