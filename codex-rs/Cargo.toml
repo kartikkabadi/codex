@@ -129,6 +129,7 @@ members = [
     "codex-wire-protocol",
     "state",
     "codex-wire-protocol-openai",
+    "codex-wire-protocol-anthropic",
     "terminal-detection",
     "test-binary-support",
     "thread-manager-sample",
@@ -161,6 +162,7 @@ codex-auth = { path = "codex-auth" }
 codex-aws-auth = { path = "aws-auth" }
 codex-wire-protocol = { path = "codex-wire-protocol" }
 codex-wire-protocol-openai = { path = "codex-wire-protocol-openai" }
+codex-wire-protocol-anthropic = { path = "codex-wire-protocol-anthropic" }
 codex-app-server = { path = "app-server" }
 codex-app-server-transport = { path = "app-server-transport" }
 codex-app-server-daemon = { path = "app-server-daemon" }
