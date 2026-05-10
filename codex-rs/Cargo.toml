@@ -130,6 +130,7 @@ members = [
     "state",
     "codex-wire-protocol-openai",
     "codex-wire-protocol-anthropic",
+    "codex-wire-protocol-gemini",
     "terminal-detection",
     "test-binary-support",
     "thread-manager-sample",
