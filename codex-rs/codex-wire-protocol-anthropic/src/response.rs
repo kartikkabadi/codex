@@ -19,7 +19,8 @@ pub fn response_stream_to_turn_stream(
         while let Some(result) = rx_sse.recv().await {
             match result {
                 Ok(event) => {
-                    if let Some(turn_event) = map_sse_event(event) {
+                    let turn_events = map_sse_event(event);
+                    for turn_event in turn_events {
                         if tx.send(turn_event).await.is_err() {
                             break;
                         }
@@ -45,25 +46,43 @@ pub fn response_stream_to_turn_stream(
     }
 }
 
-fn map_sse_event(event: SseEvent) -> Option<TurnEvent> {
+fn map_sse_event(event: SseEvent) -> Vec<TurnEvent> {
     match event {
-        SseEvent::MessageStart { .. } => Some(TurnEvent::Started {
-            turn_id: String::new(),
-        }),
-        SseEvent::ContentBlockDelta { text, .. } => Some(TurnEvent::ContentDelta { text }),
+        SseEvent::MessageStart { .. } => {
+            vec![TurnEvent::Started {
+                turn_id: String::new(),
+            }]
+        }
+        SseEvent::ContentBlockDelta { text, .. } => {
+            vec![TurnEvent::ContentDelta { text }]
+        }
+        SseEvent::ToolUseStart { id, name, .. } => {
+            vec![TurnEvent::ToolCallStarted { call_id: id, name }]
+        }
+        SseEvent::ToolUseDelta { input_json, .. } => {
+            vec![TurnEvent::ToolCallArgumentsDelta {
+                call_id: String::new(), // Anthropic tool_use deltas don't include call_id; we rely on ordering
+                arguments: input_json,
+            }]
+        }
         SseEvent::MessageDelta { stop_reason, usage } => {
-            if stop_reason.as_deref() == Some("end_turn") {
-                Some(TurnEvent::Completed { end_turn: true })
-            } else {
-                usage.map(|u| TurnEvent::Usage {
+            let mut events = Vec::new();
+            if stop_reason.as_deref() == Some("end_turn")
+                || stop_reason.as_deref() == Some("tool_use")
+            {
+                events.push(TurnEvent::Completed { end_turn: true });
+            }
+            if let Some(u) = usage {
+                events.push(TurnEvent::Usage {
                     input_tokens: u.input_tokens,
                     output_tokens: u.output_tokens,
                     reasoning_tokens: None,
-                })
+                });
             }
+            events
         }
-        SseEvent::MessageStop => Some(TurnEvent::Completed { end_turn: true }),
-        SseEvent::Ping => None,
-        SseEvent::ContentBlockStop { .. } => None,
+        SseEvent::MessageStop => vec![TurnEvent::Completed { end_turn: true }],
+        SseEvent::Ping => Vec::new(),
+        SseEvent::ContentBlockStop { .. } => Vec::new(),
     }
 }

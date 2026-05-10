@@ -1853,6 +1853,10 @@ dependencies = [
  "codex-client",
  "codex-protocol",
  "codex-utils-rustls-provider",
+ "codex-wire-protocol",
+ "codex-wire-protocol-anthropic",
+ "codex-wire-protocol-gemini",
+ "codex-wire-protocol-openai",
  "eventsource-stream",
  "futures",
  "http 1.4.0",
@@ -2131,6 +2135,21 @@ dependencies = [
  "pretty_assertions",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "codex-auth"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "codex-wire-protocol",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2490,6 +2509,7 @@ dependencies = [
  "codex-app-server-protocol",
  "codex-apply-patch",
  "codex-async-utils",
+ "codex-auth",
  "codex-code-mode",
  "codex-config",
  "codex-connectors",
@@ -2537,6 +2557,7 @@ dependencies = [
  "codex-utils-string",
  "codex-utils-template",
  "codex-windows-sandbox",
+ "codex-wire-protocol",
  "core_test_support",
  "csv",
  "ctor 0.6.3",
@@ -3016,6 +3037,7 @@ dependencies = [
  "chrono",
  "codex-agent-identity",
  "codex-app-server-protocol",
+ "codex-auth",
  "codex-client",
  "codex-config",
  "codex-keyring-store",
@@ -3024,6 +3046,7 @@ dependencies = [
  "codex-protocol",
  "codex-terminal-detection",
  "codex-utils-template",
+ "codex-wire-protocol",
  "core_test_support",
  "jsonwebtoken",
  "keyring",
@@ -4059,6 +4082,82 @@ dependencies = [
  "windows 0.58.0",
  "windows-sys 0.52.0",
  "winres",
+]
+
+[[package]]
+name = "codex-wire-protocol"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "futures",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "codex-wire-protocol-anthropic"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "codex-wire-protocol",
+ "futures",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
+ "wiremock",
+]
+
+[[package]]
+name = "codex-wire-protocol-gemini"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "codex-wire-protocol",
+ "futures",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
+ "wiremock",
+]
+
+[[package]]
+name = "codex-wire-protocol-openai"
+version = "0.0.0"
+dependencies = [
+ "bytes",
+ "codex-protocol",
+ "codex-wire-protocol",
+ "eventsource-stream",
+ "futures",
+ "http 1.4.0",
+ "regex-lite",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util",
+ "tracing",
+ "tungstenite",
+ "url",
+ "uuid",
 ]
 
 [[package]]

@@ -185,6 +185,7 @@ pub struct OpenAiModelsManager {
     endpoint_client: SharedModelsEndpointClient,
     auth_manager: Option<Arc<AuthManager>>,
     catalog: Arc<dyn ModelCatalog>,
+    cached_remote_models: Option<Vec<ModelInfo>>,
 }
 
 /// Static model manager backed by an authoritative in-process catalog.
@@ -204,7 +205,8 @@ impl OpenAiModelsManager {
     ) -> Self {
         let cache_path = codex_home.join(MODEL_CACHE_FILE);
         let cache_manager = ModelsCacheManager::new(cache_path, DEFAULT_MODEL_CACHE_TTL);
-        let remote_models = load_remote_models_from_file().unwrap_or_default();
+        let cached_remote_models = load_remote_models_from_file().ok();
+        let remote_models = cached_remote_models.clone().unwrap_or_default();
         Self {
             remote_models: RwLock::new(remote_models),
             etag: RwLock::new(None),
@@ -212,6 +214,7 @@ impl OpenAiModelsManager {
             endpoint_client,
             auth_manager,
             catalog,
+            cached_remote_models,
         }
     }
 }
@@ -324,7 +327,7 @@ impl OpenAiModelsManager {
 
     /// Replace the cached remote models and rebuild the derived presets list.
     async fn apply_remote_models(&self, models: Vec<ModelInfo>) {
-        let mut existing_models = load_remote_models_from_file().unwrap_or_default();
+        let mut existing_models = self.cached_remote_models.clone().unwrap_or_default();
         for model in models {
             if let Some(existing_index) = existing_models
                 .iter()

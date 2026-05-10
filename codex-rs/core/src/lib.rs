@@ -39,6 +39,8 @@ mod flags;
 #[cfg(test)]
 mod git_info_tests;
 mod goals;
+#[cfg(test)]
+mod multi_protocol_tests;
 pub use goals::ExternalGoalPreviousStatus;
 pub use goals::ExternalGoalSet;
 mod guardian;

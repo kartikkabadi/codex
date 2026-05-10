@@ -3,7 +3,8 @@
 use codex_wire_protocol::error::WireError;
 use codex_wire_protocol::request::CompactRequest;
 use codex_wire_protocol::response::CompactResponse;
-use http::{HeaderMap, Method};
+use http::HeaderMap;
+use http::Method;
 use reqwest::Client;
 
 use crate::types::CompactionInput;
@@ -43,32 +44,30 @@ pub async fn compact_context(
     let resp = req.send().await.map_err(WireError::Http)?;
     let body = resp.bytes().await.map_err(WireError::Http)?;
 
-    let parsed: CompactHistoryResponse =
-        serde_json::from_slice(&body).map_err(|e| WireError::Stream(format!(
+    let parsed: CompactHistoryResponse = serde_json::from_slice(&body).map_err(|e| {
+        WireError::Stream(format!(
             "failed to decode compaction response: {e}; body: {}",
             String::from_utf8_lossy(&body)
-        )))?;
+        ))
+    })?;
 
     Ok(CompactResponse {
         summary: parsed
             .output
             .iter()
             .filter_map(|item| match item {
-                codex_protocol::models::ResponseItem::Message { content, .. } => {
-                    Some(
-                        content
-                            .iter()
-                            .filter_map(|c| match c {
-                                codex_protocol::models::ContentItem::OutputText {
-                                    text,
-                                    ..
-                                } => Some(text.as_str()),
-                                _ => None,
-                            })
-                            .collect::<Vec<_>>()
-                            .join(""),
-                    )
-                }
+                codex_protocol::models::ResponseItem::Message { content, .. } => Some(
+                    content
+                        .iter()
+                        .filter_map(|c| match c {
+                            codex_protocol::models::ContentItem::OutputText { text, .. } => {
+                                Some(text.as_str())
+                            }
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join(""),
+                ),
                 _ => None,
             })
             .collect::<Vec<_>>()

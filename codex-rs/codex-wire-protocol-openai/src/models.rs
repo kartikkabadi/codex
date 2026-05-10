@@ -1,9 +1,12 @@
 // codex-wire-protocol-openai/src/models.rs
 
-use codex_protocol::openai_models::{ModelInfo, ModelsResponse};
+use codex_protocol::openai_models::ModelInfo;
+use codex_protocol::openai_models::ModelsResponse;
 use codex_wire_protocol::error::WireError;
 use codex_wire_protocol::response::ModelInfo as WireModelInfo;
-use http::{HeaderMap, Method, header::ETAG};
+use http::HeaderMap;
+use http::Method;
+use http::header::ETAG;
 use reqwest::Client;
 
 /// List available models from an OpenAI-compatible endpoint.

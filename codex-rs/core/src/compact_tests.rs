@@ -197,6 +197,7 @@ fn should_use_remote_compact_task_for_azure_provider() {
         wire_api: WireApi::Responses,
         query_params: None,
         http_headers: None,
+        protocol_id: "openai-responses".to_string(),
         env_http_headers: None,
         request_max_retries: None,
         stream_max_retries: None,

@@ -32,10 +32,20 @@ pub struct Content {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum Part {
+    #[serde(rename = "text")]
     Text { text: String },
-    InlineData { inline_data: Blob },
-    FunctionCall { function_call: FunctionCall },
-    FunctionResponse { function_response: FunctionResponse },
+    #[serde(rename = "inlineData")]
+    InlineData { mime_type: String, data: String },
+    #[serde(rename = "functionCall")]
+    FunctionCall {
+        name: String,
+        args: serde_json::Value,
+    },
+    #[serde(rename = "functionResponse")]
+    FunctionResponse {
+        name: String,
+        response: serde_json::Value,
+    },
 }
 
 /// Binary data blob.

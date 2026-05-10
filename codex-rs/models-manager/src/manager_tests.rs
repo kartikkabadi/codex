@@ -1,5 +1,6 @@
 use super::*;
 use crate::ModelsManagerConfig;
+use crate::catalogs::generic::GenericModelCatalog;
 use chrono::Utc;
 use codex_app_server_protocol::AuthMode;
 use codex_login::AuthCredentialsStoreMode;
@@ -187,7 +188,12 @@ fn openai_manager_for_tests_with_auth(
     endpoint_client: Arc<dyn ModelsEndpointClient>,
     auth_manager: Option<Arc<AuthManager>>,
 ) -> OpenAiModelsManager {
-    OpenAiModelsManager::new(codex_home, endpoint_client, auth_manager)
+    OpenAiModelsManager::new(
+        codex_home,
+        endpoint_client,
+        auth_manager,
+        Arc::new(GenericModelCatalog::new("test")),
+    )
 }
 
 fn static_manager_for_tests(model_catalog: ModelsResponse) -> StaticModelsManager {

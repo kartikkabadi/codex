@@ -1,26 +1,22 @@
 // codex-wire-protocol-openai/src/request.rs
 
-use codex_wire_protocol::request::{
-    ReasoningConfig, ReasoningEffort, ToolChoice, ToolSpec, TurnItem, TurnRequest,
-};
+use codex_wire_protocol::request::ReasoningConfig;
+use codex_wire_protocol::request::ReasoningEffort;
+use codex_wire_protocol::request::ToolChoice;
+use codex_wire_protocol::request::ToolSpec;
+use codex_wire_protocol::request::TurnItem;
+use codex_wire_protocol::request::TurnRequest;
 
-use crate::types::{Reasoning, ResponsesApiRequest};
+use crate::types::Reasoning;
+use crate::types::ResponsesApiRequest;
 
 /// Convert a generic `TurnRequest` into an OpenAI `ResponsesApiRequest`.
 pub fn turn_request_to_responses_api_request(req: TurnRequest) -> ResponsesApiRequest {
     ResponsesApiRequest {
         model: req.model,
         instructions: req.instructions,
-        input: req
-            .input
-            .into_iter()
-            .map(map_turn_item)
-            .collect(),
-        tools: req
-            .tools
-            .into_iter()
-            .map(map_tool_spec)
-            .collect(),
+        input: req.input.into_iter().map(map_turn_item).collect(),
+        tools: req.tools.into_iter().map(map_tool_spec).collect(),
         tool_choice: map_tool_choice(req.tool_choice),
         parallel_tool_calls: false,
         reasoning: req.reasoning.map(map_reasoning_config),
@@ -39,9 +35,7 @@ fn map_turn_item(item: TurnItem) -> codex_protocol::models::ResponseItem {
         TurnItem::Message { role, content } => codex_protocol::models::ResponseItem::Message {
             id: None,
             role: map_role(role),
-            content: vec![codex_protocol::models::ContentItem::OutputText {
-                text: content,
-            }],
+            content: vec![codex_protocol::models::ContentItem::OutputText { text: content }],
             phase: None,
         },
         TurnItem::Image { mime_type, data } => codex_protocol::models::ResponseItem::Message {

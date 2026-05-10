@@ -1,13 +1,14 @@
 // codex-wire-protocol-openai/src/protocol.rs
 
-use std::future::Future;
-
 use codex_wire_protocol::auth::AuthToken;
 use codex_wire_protocol::capabilities::ProtocolCapabilities;
 use codex_wire_protocol::error::WireError;
 use codex_wire_protocol::protocol::WireProtocol;
-use codex_wire_protocol::request::{CompactRequest, TurnRequest};
-use codex_wire_protocol::response::{CompactResponse, ModelInfo, TurnStream};
+use codex_wire_protocol::request::CompactRequest;
+use codex_wire_protocol::request::TurnRequest;
+use codex_wire_protocol::response::CompactResponse;
+use codex_wire_protocol::response::ModelInfo;
+use codex_wire_protocol::response::TurnStream;
 use futures::StreamExt;
 use http::HeaderMap;
 use reqwest::Client;
@@ -67,17 +68,17 @@ impl WireProtocol for OpenAiWireProtocol {
         &self,
         request: TurnRequest,
         auth: AuthToken,
-    ) -> impl Future<Output = Result<TurnStream, WireError>> + Send {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<TurnStream, WireError>> + Send>>
+    {
         let client = self.client.clone();
         let base_url = self.base_url.clone();
         let idle_timeout = self.idle_timeout;
-        async move {
+        Box::pin(async move {
             let api_key = Self::api_key(&auth)?;
             let openai_request: ResponsesApiRequest =
                 turn_request_to_responses_api_request(request);
 
-            let body = serde_json::to_value(&openai_request)
-                .map_err(WireError::Serialization)?;
+            let body = serde_json::to_value(&openai_request).map_err(WireError::Serialization)?;
 
             let url = format!("{base_url}/responses");
             let mut req = client
@@ -91,61 +92,48 @@ impl WireProtocol for OpenAiWireProtocol {
 
             let resp = req.send().await.map_err(WireError::Http)?;
             let headers = resp.headers().clone();
-            let bytes = resp.bytes_stream().map(|r| {
-                r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
-            });
+            let bytes = resp
+                .bytes_stream()
+                .map(|r| r.map_err(|e| std::io::Error::other(e.to_string())));
             let byte_stream: crate::sse::ByteStream = Box::pin(bytes);
 
-            let openai_stream = spawn_response_stream(
-                byte_stream,
-                &headers,
-                idle_timeout,
-                None,
-                None,
-            );
+            let openai_stream =
+                spawn_response_stream(byte_stream, &headers, idle_timeout, None, None);
 
-            Ok(response_stream_to_turn_stream(openai_stream, String::new()))
-        }
+            let turn_id = format!("turn-{}", uuid::Uuid::new_v4());
+            Ok(response_stream_to_turn_stream(openai_stream, turn_id))
+        })
     }
 
     fn list_models(
         &self,
         auth: AuthToken,
-    ) -> impl Future<Output = Result<Vec<ModelInfo>, WireError>> + Send {
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Vec<ModelInfo>, WireError>> + Send>,
+    > {
         let client = self.client.clone();
         let base_url = self.base_url.clone();
-        async move {
+        Box::pin(async move {
             let api_key = Self::api_key(&auth)?;
-            let (models, _etag) = list_models(
-                &client,
-                &base_url,
-                &api_key,
-                "0.0.0",
-                HeaderMap::new(),
-            )
-            .await?;
+            let (models, _etag) =
+                list_models(&client, &base_url, &api_key, "0.0.0", HeaderMap::new()).await?;
             Ok(models)
-        }
+        })
     }
 
     fn compact_context(
         &self,
         request: CompactRequest,
         auth: AuthToken,
-    ) -> impl Future<Output = Result<CompactResponse, WireError>> + Send {
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<CompactResponse, WireError>> + Send>,
+    > {
         let client = self.client.clone();
         let base_url = self.base_url.clone();
-        async move {
+        Box::pin(async move {
             let api_key = Self::api_key(&auth)?;
-            compact_context(
-                &client,
-                &base_url,
-                &api_key,
-                request,
-                HeaderMap::new(),
-            )
-            .await
-        }
+            compact_context(&client, &base_url, &api_key, request, HeaderMap::new()).await
+        })
     }
 
     fn capabilities(&self) -> ProtocolCapabilities {

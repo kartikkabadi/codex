@@ -41,12 +41,10 @@ impl From<OpenAiError> for codex_wire_protocol::error::WireError {
                 codex_wire_protocol::error::WireError::Serialization(e)
             }
             OpenAiError::Stream(msg) => codex_wire_protocol::error::WireError::Stream(msg),
-            OpenAiError::ContextWindowExceeded => {
-                codex_wire_protocol::error::WireError::Provider {
-                    code: "context_length_exceeded".into(),
-                    message: "Context window exceeded".into(),
-                }
-            }
+            OpenAiError::ContextWindowExceeded => codex_wire_protocol::error::WireError::Provider {
+                code: "context_length_exceeded".into(),
+                message: "Context window exceeded".into(),
+            },
             OpenAiError::QuotaExceeded => codex_wire_protocol::error::WireError::Provider {
                 code: "insufficient_quota".into(),
                 message: "Quota exceeded".into(),
@@ -67,16 +65,13 @@ impl From<OpenAiError> for codex_wire_protocol::error::WireError {
                     message,
                 }
             }
-            OpenAiError::ServerOverloaded => {
-                codex_wire_protocol::error::WireError::Provider {
-                    code: "server_overloaded".into(),
-                    message: "Server overloaded".into(),
-                }
-            }
+            OpenAiError::ServerOverloaded => codex_wire_protocol::error::WireError::Provider {
+                code: "server_overloaded".into(),
+                message: "Server overloaded".into(),
+            },
             OpenAiError::Retryable { message, delay } => {
                 codex_wire_protocol::error::WireError::RateLimited(format!(
-                    "{message} (retry after: {:?})",
-                    delay
+                    "{message} (retry after: {delay:?})"
                 ))
             }
             OpenAiError::WebSocket(msg) => codex_wire_protocol::error::WireError::Stream(msg),

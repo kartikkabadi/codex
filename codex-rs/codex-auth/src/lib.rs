@@ -6,6 +6,7 @@ pub mod api_key;
 pub mod aws_sigv4;
 pub mod factory;
 pub mod gcp;
+pub mod noop;
 pub mod oauth2;
 
 pub use factory::create_auth_provider;
