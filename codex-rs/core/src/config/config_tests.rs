@@ -9068,6 +9068,7 @@ name = "OpenAI custom"
 base_url = "https://api.openai.com/v1"
 env_key = "OPENAI_API_KEY"
 wire_api = "responses"
+protocol_id = "openai-responses"
 request_max_retries = 4            # retry failed HTTP requests
 stream_max_retries = 10            # retry dropped SSE streams
 stream_idle_timeout_ms = 300000    # 5m idle timeout
@@ -9113,6 +9114,37 @@ model_verbosity = "high"
 
     let codex_home_temp_dir = TempDir::new().unwrap();
 
+    let openai_custom_provider = ModelProviderInfo {
+        name: "OpenAI custom".to_string(),
+        base_url: Some("https://api.openai.com/v1".to_string()),
+        env_key: Some("OPENAI_API_KEY".to_string()),
+        wire_api: WireApi::Responses,
+        env_key_instructions: None,
+        experimental_bearer_token: None,
+        auth: None,
+        aws: None,
+        query_params: None,
+        http_headers: None,
+        env_http_headers: None,
+        request_max_retries: Some(4),
+        stream_max_retries: Some(10),
+        stream_idle_timeout_ms: Some(300_000),
+        websocket_connect_timeout_ms: Some(15_000),
+        requires_openai_auth: false,
+        supports_websockets: false,
+        protocol_id: "openai-responses".to_string(),
+    };
+    let model_provider_map = {
+        let mut model_provider_map =
+            built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None);
+        model_provider_map.insert("openai-custom".to_string(), openai_custom_provider.clone());
+        model_provider_map
+    };
+
+    let openai_provider = model_provider_map
+        .get("openai")
+        .expect("openai provider should exist")
+        .clone();
     Ok(PrecedenceTestFixture {
         cwd: cwd_temp_dir,
         codex_home: codex_home_temp_dir,
