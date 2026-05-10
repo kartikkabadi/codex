@@ -1,6 +1,7 @@
 // codex-wire-protocol/src/request.rs
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A generic turn request, protocol-agnostic.
 #[derive(Debug, Clone, Serialize, Deserialize)]
