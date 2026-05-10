@@ -1,5 +1,4 @@
 use std::io;
-use std::sync::LazyLock;
 
 use crate::key_hint;
 use crate::key_hint::KeyBinding;
@@ -28,7 +27,6 @@ use ratatui::layout::Constraint;
 use ratatui::layout::Direction;
 use ratatui::layout::HorizontalAlignment;
 use ratatui::layout::Layout;
-use ratatui::layout::Margin;
 use ratatui::layout::Rect;
 use ratatui::prelude::*;
 use ratatui::style::Color;
@@ -40,47 +38,23 @@ use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
 use ratatui::widgets::WidgetRef;
 use ratatui::widgets::Wrap;
-use std::time::Duration;
-
-#[derive(Clone)]
-struct ProviderOption {
+/// A single provider row shown in the scrollable list.
+struct ProviderItem {
+    id: String,
     name: String,
-    status: ProviderStatus,
+    protocol: String,
+    auth_type: String,
 }
 
-#[derive(Clone)]
-enum ProviderStatus {
-    Running,
-    NotRunning,
-    Unknown,
-}
+pub struct OssSelectionWidget {
+    providers: Vec<ProviderItem>,
+    filtered_indices: Vec<usize>,
 
-/// Options displayed in the *select* mode.
-///
-/// The `key` is matched case-insensitively.
-struct SelectOption {
-    label: Line<'static>,
-    description: &'static str,
-    key: KeyCode,
-    provider_id: &'static str,
-}
+    /// Currently selected index in *filtered* list.
+    selected_index: usize,
 
-static OSS_SELECT_OPTIONS: LazyLock<Vec<SelectOption>> = LazyLock::new(|| {
-    vec![
-        SelectOption {
-            label: Line::from(vec!["L".underlined(), "M Studio".into()]),
-            description: "Local LM Studio server (default port 1234)",
-            key: KeyCode::Char('l'),
-            provider_id: LMSTUDIO_OSS_PROVIDER_ID,
-        },
-        SelectOption {
-            label: Line::from(vec!["O".underlined(), "llama".into()]),
-            description: "Local Ollama server (Responses API, default port 11434)",
-            key: KeyCode::Char('o'),
-            provider_id: OLLAMA_OSS_PROVIDER_ID,
-        },
-    ]
-});
+    /// Scroll offset for the provider list.
+    scroll_offset: usize,
 
 // This startup wizard runs before the main TUI runtime keymap is available, so
 // it mirrors the built-in horizontal list defaults instead of reading config.
@@ -98,81 +72,65 @@ pub struct OssSelectionWidget<'a> {
     select_options: &'a Vec<SelectOption>,
     confirmation_prompt: Paragraph<'a>,
 
-    /// Currently selected index in *select* mode.
-    selected_option: usize,
-
-    /// Set to `true` once a decision has been sent – the parent view can then
-    /// remove this widget from its queue.
+    /// Set to `true` once a decision has been sent.
     done: bool,
 
     selection: Option<String>,
 }
 
-impl OssSelectionWidget<'_> {
-    fn new(lmstudio_status: ProviderStatus, ollama_status: ProviderStatus) -> io::Result<Self> {
-        let providers = vec![
-            ProviderOption {
-                name: "LM Studio".to_string(),
-                status: lmstudio_status,
-            },
-            ProviderOption {
-                name: "Ollama (Responses)".to_string(),
-                status: ollama_status.clone(),
-            },
-            ProviderOption {
-                name: "Ollama (Chat)".to_string(),
-                status: ollama_status,
-            },
-        ];
+impl OssSelectionWidget {
+    fn new() -> io::Result<Self> {
+        let built_in = built_in_model_providers(None);
+        let mut providers: Vec<ProviderItem> = built_in
+            .into_iter()
+            .map(|(id, info)| ProviderItem {
+                id: id.clone(),
+                name: info.name.clone(),
+                protocol: info.protocol_id.clone(),
+                auth_type: format_auth(&info),
+            })
+            .collect();
 
-        let mut contents: Vec<Line> = vec![
-            Line::from(vec![
-                "? ".fg(Color::Blue),
-                "Select an open-source provider".bold(),
-            ]),
-            Line::from(""),
-            Line::from("  Choose which local AI server to use for your session."),
-            Line::from(""),
-        ];
+        // Sort by name for consistent display.
+        providers.sort_by(|a, b| a.name.cmp(&b.name));
 
-        // Add status indicators for each provider
-        for provider in &providers {
-            let (status_symbol, status_color) = get_status_symbol_and_color(&provider.status);
-            contents.push(Line::from(vec![
-                Span::raw("  "),
-                Span::styled(status_symbol, Style::default().fg(status_color)),
-                Span::raw(format!(" {} ", provider.name)),
-            ]));
-        }
-        contents.push(Line::from(""));
-        contents.push(Line::from("  ● Running  ○ Not Running").add_modifier(Modifier::DIM));
-
-        contents.push(Line::from(""));
-        contents.push(
-            Line::from("  Press Enter to select • Ctrl+C to exit").add_modifier(Modifier::DIM),
-        );
-
-        let confirmation_prompt = Paragraph::new(contents).wrap(Wrap { trim: false });
+        let filtered_indices: Vec<usize> = (0..providers.len()).collect();
 
         Ok(Self {
-            select_options: &OSS_SELECT_OPTIONS,
-            confirmation_prompt,
-            selected_option: 0,
+            providers,
+            filtered_indices,
+            selected_index: 0,
+            scroll_offset: 0,
+            filter_text: String::new(),
             done: false,
             selection: None,
         })
     }
 
-    fn get_confirmation_prompt_height(&self, width: u16) -> u16 {
-        // Should cache this for last value of width.
-        self.confirmation_prompt.line_count(width) as u16
+    fn apply_filter(&mut self) {
+        let query = self.filter_text.to_lowercase();
+        self.filtered_indices = self
+            .providers
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| {
+                p.name.to_lowercase().contains(&query)
+                    || p.id.to_lowercase().contains(&query)
+                    || p.protocol.to_lowercase().contains(&query)
+            })
+            .map(|(i, _)| i)
+            .collect();
+        self.selected_index = 0;
+        self.scroll_offset = 0;
     }
 
-    /// Process a `KeyEvent` coming from crossterm. Always consumes the event
-    /// while the modal is visible.
-    /// Process a key event originating from crossterm. As the modal fully
-    /// captures input while visible, we don't need to report whether the event
-    /// was consumed—callers can assume it always is.
+    fn selected_provider_id(&self) -> Option<String> {
+        self.filtered_indices
+            .get(self.selected_index)
+            .map(|&idx| self.providers[idx].id.clone())
+    }
+
+    /// Process a `KeyEvent` coming from crossterm.
     pub fn handle_key_event(&mut self, key: KeyEvent) -> Option<String> {
         if key.kind == KeyEventKind::Press {
             self.handle_select_key(key);
@@ -181,16 +139,6 @@ impl OssSelectionWidget<'_> {
             self.selection.clone()
         } else {
             None
-        }
-    }
-
-    /// Normalize a key for comparison.
-    /// - For `KeyCode::Char`, converts to lowercase for case-insensitive matching.
-    /// - Other key codes are returned unchanged.
-    fn normalize_keycode(code: KeyCode) -> KeyCode {
-        match code {
-            KeyCode::Char(c) => KeyCode::Char(c.to_ascii_lowercase()),
-            other => other,
         }
     }
 
@@ -233,6 +181,48 @@ impl OssSelectionWidget<'_> {
                     self.send_decision(opt.provider_id.to_string());
                 }
             }
+            KeyCode::Down => {
+                if self.selected_index + 1 < self.filtered_indices.len() {
+                    self.selected_index += 1;
+                }
+            }
+            KeyCode::PageUp => {
+                self.selected_index = self.selected_index.saturating_sub(10);
+            }
+            KeyCode::PageDown => {
+                self.selected_index =
+                    (self.selected_index + 10).min(self.filtered_indices.len().saturating_sub(1));
+            }
+            KeyCode::Home => {
+                self.selected_index = 0;
+            }
+            KeyCode::End => {
+                self.selected_index = self.filtered_indices.len().saturating_sub(1);
+            }
+            KeyCode::Enter => {
+                if let Some(id) = self.selected_provider_id() {
+                    self.send_decision(id);
+                }
+            }
+            KeyCode::Esc => {
+                self.send_decision("__CANCELLED__".to_string());
+            }
+            KeyCode::Char(c)
+                if !key_event
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL)
+                    && !key_event
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::ALT) =>
+            {
+                self.filter_text.push(c);
+                self.apply_filter();
+            }
+            KeyCode::Backspace => {
+                self.filter_text.pop();
+                self.apply_filter();
+            }
+            _ => {}
         }
     }
 
@@ -243,16 +233,13 @@ impl OssSelectionWidget<'_> {
 
     /// Returns `true` once the user has made a decision and the widget no
     /// longer needs to be displayed.
+    #[allow(dead_code)]
     pub fn is_complete(&self) -> bool {
         self.done
     }
-
-    pub fn desired_height(&self, width: u16) -> u16 {
-        self.get_confirmation_prompt_height(width) + self.select_options.len() as u16
-    }
 }
 
-impl WidgetRef for &OssSelectionWidget<'_> {
+impl WidgetRef for OssSelectionWidget {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         let prompt_height = self.get_confirmation_prompt_height(area.width);
         let [prompt_chunk, response_chunk] = Layout::default()
@@ -281,35 +268,114 @@ impl WidgetRef for &OssSelectionWidget<'_> {
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Min(0),
+            Constraint::Length(2),
         ])
-        .areas(response_chunk.inner(Margin::new(1, 0)));
+        .areas(area);
 
-        Line::from("Select provider?").render(title_area, buf);
+        // Header
+        let header_lines = vec![
+            Line::from(vec!["? ".fg(Color::Blue), "Select a model provider".bold()]),
+            Line::from(vec![
+                "  ".into(),
+                format!("{} providers available", self.providers.len()).dim(),
+            ]),
+            Line::from(vec![
+                "  Filter: ".dim(),
+                if self.filter_text.is_empty() {
+                    "(type to search)".dim()
+                } else {
+                    self.filter_text.clone().into()
+                },
+            ]),
+        ];
+        Paragraph::new(header_lines)
+            .wrap(Wrap { trim: false })
+            .render(header_area, buf);
 
-        self.confirmation_prompt.clone().render(prompt_chunk, buf);
-        let areas = Layout::horizontal(
-            lines
-                .iter()
-                .map(|l| Constraint::Length(l.width() as u16 + 2)),
-        )
-        .spacing(1)
-        .split(button_area);
-        for (idx, area) in areas.iter().enumerate() {
-            let line = &lines[idx];
-            line.render(*area, buf);
+        // List
+        let visible_count = list_area.height as usize;
+        let total = self.filtered_indices.len();
+
+        // Adjust scroll offset to keep selection visible.
+        let adjusted_scroll = if self.selected_index < self.scroll_offset {
+            self.selected_index
+        } else if self.selected_index >= self.scroll_offset + visible_count {
+            self.selected_index.saturating_sub(visible_count - 1)
+        } else {
+            self.scroll_offset
+        };
+
+        let mut list_lines: Vec<Line> = Vec::new();
+        for i in 0..visible_count {
+            let idx = adjusted_scroll + i;
+            if idx >= total {
+                break;
+            }
+            let provider_idx = self.filtered_indices[idx];
+            let provider = &self.providers[provider_idx];
+            let is_selected = idx == self.selected_index;
+
+            let caret = if is_selected { ">" } else { " " };
+            let name_style = if is_selected {
+                Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::new()
+            };
+            let meta_style = Style::new().fg(Color::DarkGray);
+
+            list_lines.push(Line::from(vec![
+                Span::styled(format!("{caret} "), name_style),
+                Span::styled(provider.name.clone(), name_style),
+                Span::styled(
+                    format!(
+                        "  [{} | {} | {}]",
+                        provider.id, provider.protocol, provider.auth_type
+                    ),
+                    meta_style,
+                ),
+            ]));
         }
 
-        Line::from(self.select_options[self.selected_option].description)
-            .style(Style::new().italic().fg(Color::DarkGray))
-            .render(description_area.inner(Margin::new(1, 0)), buf);
+        // Scrollbar indicator
+        if total > visible_count {
+            let scroll_info = format!(
+                "  Showing {}-{} of {}",
+                adjusted_scroll + 1,
+                (adjusted_scroll + visible_count).min(total),
+                total
+            );
+            list_lines.push(Line::from(""));
+            list_lines.push(Line::from(scroll_info).dim());
+        }
+
+        Paragraph::new(list_lines)
+            .wrap(Wrap { trim: false })
+            .render(list_area, buf);
+
+        // Footer
+        let footer_lines = vec![
+            Line::from(vec![
+                "  ↑/↓ move • Enter select • Esc cancel • Type to filter".dim(),
+            ]),
+            Line::from(vec!["  PgUp/PgDn page • Home/End jump".dim()]),
+        ];
+        Paragraph::new(footer_lines)
+            .wrap(Wrap { trim: false })
+            .render(footer_area, buf);
     }
 }
 
-fn get_status_symbol_and_color(status: &ProviderStatus) -> (&'static str, Color) {
-    match status {
-        ProviderStatus::Running => ("●", Color::Green),
-        ProviderStatus::NotRunning => ("○", Color::Red),
-        ProviderStatus::Unknown => ("?", Color::Yellow),
+fn format_auth(info: &codex_model_provider_info::ModelProviderInfo) -> String {
+    if info.requires_openai_auth {
+        "OpenAI auth".to_string()
+    } else if info.aws.is_some() {
+        "AWS".to_string()
+    } else if info.env_key.is_some() {
+        format!("Env: {}", info.env_key.as_ref().unwrap())
+    } else if info.auth.is_some() {
+        "API key".to_string()
+    } else {
+        "None".to_string()
     }
 }
 
