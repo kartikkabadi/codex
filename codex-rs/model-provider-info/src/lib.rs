@@ -97,7 +97,7 @@ pub struct ModelProviderInfo {
     /// Optional instructions to help the user get a valid value for the
     /// variable and set it.
     pub env_key_instructions: Option<String>,
-    /// Value to use with `Authorization: Bearer <token>` header. Use of this
+    /// Value to use with `Authorization: Bearer *** header. Use of this
     /// config is discouraged in favor of `env_key` for security reasons, but
     /// this may be necessary when using this programmatically.
     pub experimental_bearer_token: Option<String>,
@@ -140,6 +140,9 @@ pub struct ModelProviderInfo {
     /// Whether this provider supports the standalone web-search endpoint.
     #[serde(default)]
     pub supports_standalone_web_search: bool,
+    /// Protocol identifier used to select the API client implementation.
+    #[serde(default)]
+    pub protocol_id: String,
 }
 
 /// AWS SigV4 auth configuration for a model provider.
@@ -276,6 +279,7 @@ impl ModelProviderInfo {
             headers,
             retry,
             stream_idle_timeout: self.stream_idle_timeout(),
+            protocol_id: self.protocol_id.clone(),
         })
     }
 
@@ -363,6 +367,7 @@ impl ModelProviderInfo {
             requires_openai_auth: true,
             supports_websockets: true,
             supports_standalone_web_search: true,
+            protocol_id: "openai-responses".into(),
         }
     }
 
@@ -397,6 +402,7 @@ impl ModelProviderInfo {
             requires_openai_auth: false,
             supports_websockets: false,
             supports_standalone_web_search: false,
+            protocol_id: "amazon-bedrock".into(),
         }
     }
 
@@ -429,6 +435,35 @@ pub const DEFAULT_OLLAMA_PORT: u16 = 11434;
 pub const LMSTUDIO_OSS_PROVIDER_ID: &str = "lmstudio";
 pub const OLLAMA_OSS_PROVIDER_ID: &str = "ollama";
 
+/// Helper to create a simple built-in provider preset.
+fn preset(
+    name: &str,
+    base_url: Option<&str>,
+    env_key: Option<&str>,
+    protocol_id: &str,
+) -> ModelProviderInfo {
+    ModelProviderInfo {
+        name: name.into(),
+        base_url: base_url.map(|s| s.into()),
+        env_key: env_key.map(|s| s.into()),
+        env_key_instructions: None,
+        experimental_bearer_token: None,
+        auth: None,
+        aws: None,
+        wire_api: WireApi::Responses,
+        query_params: None,
+        http_headers: None,
+        env_http_headers: None,
+        request_max_retries: None,
+        stream_max_retries: None,
+        stream_idle_timeout_ms: None,
+        websocket_connect_timeout_ms: None,
+        requires_openai_auth: false,
+        supports_websockets: false,
+        protocol_id: protocol_id.into(),
+    }
+}
+
 /// Built-in default provider list.
 pub fn built_in_model_providers(
     openai_base_url: Option<String>,
@@ -437,20 +472,463 @@ pub fn built_in_model_providers(
     let openai_provider = P::create_openai_provider(openai_base_url);
     let amazon_bedrock_provider = P::create_amazon_bedrock_provider(/*aws*/ None);
 
-    // We do not want to be in the business of adjucating which third-party
-    // providers are bundled with Codex CLI, so we only include the OpenAI and
-    // open source ("oss") providers by default. Users are encouraged to add to
-    // `model_providers` in config.toml to add their own providers.
     [
+        // Protocol: openai-responses
         (OPENAI_PROVIDER_ID, openai_provider),
-        (AMAZON_BEDROCK_PROVIDER_ID, amazon_bedrock_provider),
+        (
+            "azure-openai",
+            preset("Azure OpenAI", None, Some("AZURE_OPENAI_API_KEY"), "openai-responses"),
+        ),
+        // Protocol: openai-chat-completions
+        (
+            "openrouter",
+            preset(
+                "OpenRouter",
+                Some("https://openrouter.ai/api/v1"),
+                Some("OPENROUTER_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "groq",
+            preset(
+                "Groq",
+                Some("https://api.groq.com/openai/v1"),
+                Some("GROQ_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "together",
+            preset(
+                "Together",
+                Some("https://api.together.xyz/v1"),
+                Some("TOGETHER_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "fireworks",
+            preset(
+                "Fireworks",
+                Some("https://api.fireworks.ai/inference/v1"),
+                Some("FIREWORKS_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "anyscale",
+            preset(
+                "Anyscale",
+                Some("https://api.endpoints.anyscale.com/v1"),
+                Some("ANYSCALE_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "deepinfra",
+            preset(
+                "DeepInfra",
+                Some("https://api.deepinfra.com/v1/openai"),
+                Some("DEEPINFRA_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "perplexity",
+            preset(
+                "Perplexity",
+                Some("https://api.perplexity.ai"),
+                Some("PERPLEXITY_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "mistral",
+            preset(
+                "Mistral",
+                Some("https://api.mistral.ai/v1"),
+                Some("MISTRAL_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "cohere",
+            preset(
+                "Cohere",
+                Some("https://api.cohere.com/v1"),
+                Some("COHERE_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "ai21",
+            preset(
+                "AI21",
+                Some("https://api.ai21.com/studio/v1"),
+                Some("AI21_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "novita",
+            preset(
+                "Novita",
+                Some("https://api.novita.ai/v3/openai"),
+                Some("NOVITA_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "siliconflow",
+            preset(
+                "SiliconFlow",
+                Some("https://api.siliconflow.cn/v1"),
+                Some("SILICONFLOW_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "hyperbolic",
+            preset(
+                "Hyperbolic",
+                Some("https://api.hyperbolic.xyz/v1"),
+                Some("HYPERBOLIC_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "lambda",
+            preset(
+                "Lambda",
+                Some("https://api.lambdalabs.com/v1"),
+                Some("LAMBDA_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "friendli",
+            preset(
+                "Friendli",
+                Some("https://api.friendli.ai/v1"),
+                Some("FRIENDLI_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "sambanova",
+            preset(
+                "SambaNova",
+                Some("https://api.sambanova.ai/v1"),
+                Some("SAMBANOVA_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "nvidia",
+            preset(
+                "NVIDIA",
+                Some("https://integrate.api.nvidia.com/v1"),
+                Some("NVIDIA_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "localai",
+            preset(
+                "LocalAI",
+                Some("http://localhost:8080/v1"),
+                None,
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "xai",
+            preset(
+                "xAI",
+                Some("https://api.x.ai/v1"),
+                Some("XAI_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "deepseek",
+            preset(
+                "DeepSeek",
+                Some("https://api.deepseek.com/v1"),
+                Some("DEEPSEEK_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "moonshot",
+            preset(
+                "Moonshot",
+                Some("https://api.moonshot.cn/v1"),
+                Some("MOONSHOT_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "qwen",
+            preset(
+                "Qwen",
+                Some("https://dashscope.aliyuncs.com/compatible-mode/v1"),
+                Some("DASHSCOPE_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "minimax",
+            preset(
+                "MiniMax",
+                Some("https://api.minimax.chat/v1"),
+                Some("MINIMAX_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "yi",
+            preset(
+                "Yi",
+                Some("https://api.01.ai/v1"),
+                Some("YI_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "huggingface",
+            preset(
+                "Hugging Face",
+                Some("https://api-inference.huggingface.co/v1"),
+                Some("HF_API_TOKEN"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "cloudflare",
+            preset(
+                "Cloudflare",
+                None,
+                Some("CF_API_TOKEN"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "predibase",
+            preset(
+                "Predibase",
+                Some("https://serving.predibase.com/v1"),
+                Some("PREDIBASE_API_TOKEN"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "octoai",
+            preset(
+                "OctoAI",
+                Some("https://text.octoai.run/v1"),
+                Some("OCTOAI_API_TOKEN"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "lepton",
+            preset(
+                "Lepton",
+                None,
+                Some("LEPTON_API_TOKEN"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "skywork",
+            preset(
+                "Skywork",
+                Some("https://api.skywork.ai/v1"),
+                Some("SKYWORK_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "zhipu",
+            preset(
+                "Zhipu",
+                Some("https://open.bigmodel.cn/api/paas/v4"),
+                Some("ZHIPU_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "baichuan",
+            preset(
+                "Baichuan",
+                Some("https://api.baichuan-ai.com/v1"),
+                Some("BAICHUAN_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "stepfun",
+            preset(
+                "StepFun",
+                Some("https://api.stepfun.com/v1"),
+                Some("STEPFUN_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "spark",
+            preset(
+                "Spark",
+                Some("https://spark-api-open.xf-yun.com/v1"),
+                Some("SPARK_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
+        (
+            "azure-ai",
+            preset(
+                "Azure AI",
+                None,
+                Some("AZURE_AI_API_KEY"),
+                "openai-chat-completions",
+            ),
+        ),
         (
             OLLAMA_OSS_PROVIDER_ID,
-            create_oss_provider(DEFAULT_OLLAMA_PORT, WireApi::Responses),
+            preset(
+                "Ollama",
+                Some("http://localhost:11434/v1"),
+                None,
+                "openai-chat-completions",
+            ),
         ),
         (
             LMSTUDIO_OSS_PROVIDER_ID,
-            create_oss_provider(DEFAULT_LMSTUDIO_PORT, WireApi::Responses),
+            preset(
+                "LM Studio",
+                Some("http://localhost:1234/v1"),
+                None,
+                "openai-chat-completions",
+            ),
+        ),
+        // Protocol: anthropic-messages
+        (
+            "anthropic",
+            preset(
+                "Anthropic",
+                Some("https://api.anthropic.com/v1"),
+                Some("ANTHROPIC_API_KEY"),
+                "anthropic-messages",
+            ),
+        ),
+        (
+            "claude-aws",
+            ModelProviderInfo {
+                name: "Claude (AWS)".into(),
+                base_url: None,
+                env_key: None,
+                env_key_instructions: None,
+                experimental_bearer_token: None,
+                auth: None,
+                aws: Some(ModelProviderAwsAuthInfo {
+                    profile: None,
+                    region: Some("us-east-1".into()),
+                }),
+                wire_api: WireApi::Responses,
+                query_params: None,
+                http_headers: None,
+                env_http_headers: None,
+                request_max_retries: None,
+                stream_max_retries: None,
+                stream_idle_timeout_ms: None,
+                websocket_connect_timeout_ms: None,
+                requires_openai_auth: false,
+                supports_websockets: false,
+                protocol_id: "anthropic-messages".into(),
+            },
+        ),
+        (
+            "claude-gcp",
+            ModelProviderInfo {
+                name: "Claude (GCP)".into(),
+                base_url: None,
+                env_key: None,
+                env_key_instructions: None,
+                experimental_bearer_token: None,
+                auth: None,
+                aws: None,
+                wire_api: WireApi::Responses,
+                query_params: None,
+                http_headers: None,
+                env_http_headers: None,
+                request_max_retries: None,
+                stream_max_retries: None,
+                stream_idle_timeout_ms: None,
+                websocket_connect_timeout_ms: None,
+                requires_openai_auth: false,
+                supports_websockets: false,
+                protocol_id: "anthropic-messages".into(),
+            },
+        ),
+        // Protocol: gemini
+        (
+            "gemini",
+            preset(
+                "Gemini",
+                Some("https://generativelanguage.googleapis.com/v1beta"),
+                Some("GOOGLE_API_KEY"),
+                "gemini",
+            ),
+        ),
+        (
+            "vertex-ai",
+            ModelProviderInfo {
+                name: "Vertex AI".into(),
+                base_url: None,
+                env_key: None,
+                env_key_instructions: None,
+                experimental_bearer_token: None,
+                auth: None,
+                aws: None,
+                wire_api: WireApi::Responses,
+                query_params: None,
+                http_headers: None,
+                env_http_headers: None,
+                request_max_retries: None,
+                stream_max_retries: None,
+                stream_idle_timeout_ms: None,
+                websocket_connect_timeout_ms: None,
+                requires_openai_auth: false,
+                supports_websockets: false,
+                protocol_id: "gemini".into(),
+            },
+        ),
+        // Protocol: bedrock
+        (
+            AMAZON_BEDROCK_PROVIDER_ID,
+            amazon_bedrock_provider,
+        ),
+        // Protocol: replicate
+        (
+            "replicate",
+            preset(
+                "Replicate",
+                Some("https://api.replicate.com/v1"),
+                Some("REPLICATE_API_TOKEN"),
+                "replicate",
+            ),
+        ),
+        // Protocol: baseten
+        (
+            "baseten",
+            preset(
+                "Baseten",
+                None,
+                Some("BASETEN_API_KEY"),
+                "baseten",
+            ),
         ),
     ]
     .into_iter()
@@ -541,6 +1019,7 @@ pub fn create_oss_provider_with_base_url(base_url: &str, wire_api: WireApi) -> M
         requires_openai_auth: false,
         supports_websockets: false,
         supports_standalone_web_search: false,
+        protocol_id: "oss".into(),
     }
 }
 
