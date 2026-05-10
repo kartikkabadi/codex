@@ -1,6 +1,7 @@
 // codex-wire-protocol/src/response.rs
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A stream of turn events from the provider.
 pub struct TurnStream {

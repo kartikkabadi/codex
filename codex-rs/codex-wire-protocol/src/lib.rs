@@ -9,12 +9,23 @@ pub mod protocol;
 pub mod request;
 pub mod response;
 
+pub use auth::AuthError;
+pub use auth::AuthProvider;
 pub use auth::AuthToken;
+pub use auth::AuthType;
 pub use capabilities::ProtocolCapabilities;
 pub use error::WireError;
 pub use protocol::WireProtocol;
-pub use request::{
-    CompactRequest, ReasoningConfig, ReasoningEffort, Role, ToolChoice, ToolSpec, TurnItem,
-    TurnRequest,
-};
-pub use response::{CompactResponse, ModelInfo, TurnEvent, TurnStream, Usage};
+pub use request::CompactRequest;
+pub use request::ReasoningConfig;
+pub use request::ReasoningEffort;
+pub use request::Role;
+pub use request::ToolChoice;
+pub use request::ToolSpec;
+pub use request::TurnItem;
+pub use request::TurnRequest;
+pub use response::CompactResponse;
+pub use response::ModelInfo;
+pub use response::TurnEvent;
+pub use response::TurnStream;
+pub use response::Usage;
