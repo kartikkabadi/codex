@@ -164,6 +164,7 @@ codex-aws-auth = { path = "aws-auth" }
 codex-wire-protocol = { path = "codex-wire-protocol" }
 codex-wire-protocol-openai = { path = "codex-wire-protocol-openai" }
 codex-wire-protocol-anthropic = { path = "codex-wire-protocol-anthropic" }
+codex-wire-protocol-gemini = { path = "codex-wire-protocol-gemini" }
 codex-app-server = { path = "app-server" }
 codex-app-server-transport = { path = "app-server-transport" }
 codex-app-server-daemon = { path = "app-server-daemon" }

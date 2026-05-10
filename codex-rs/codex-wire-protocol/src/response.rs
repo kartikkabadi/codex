@@ -38,7 +38,9 @@ pub enum TurnEvent {
         call_id: String,
         output: String,
     },
-    Completed,
+    Completed {
+        end_turn: bool,
+    },
     Failed {
         error: String,
         code: Option<String>,

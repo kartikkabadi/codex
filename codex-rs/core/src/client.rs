@@ -111,7 +111,6 @@ use tracing::warn;
 
 use crate::attestation::AttestationContext;
 use crate::attestation::AttestationProvider;
-use crate::attestation::X_OAI_ATTESTATION_HEADER;
 use crate::client_common::Prompt;
 use crate::client_common::ResponseEvent;
 use crate::client_common::ResponseStream;
@@ -138,8 +137,8 @@ use codex_response_debug_context::extract_response_debug_context;
 use codex_response_debug_context::extract_response_debug_context_from_api_error;
 use codex_response_debug_context::telemetry_api_error_message;
 use codex_response_debug_context::telemetry_transport_error_message;
-
 pub const OPENAI_BETA_HEADER: &str = "OpenAI-Beta";
+use crate::attestation::X_OAI_ATTESTATION_HEADER;
 pub const X_CODEX_INSTALLATION_ID_HEADER: &str = "x-codex-installation-id";
 pub const X_CODEX_ROUTING_HINT_HEADER: &str = "x-codex-routing-hint";
 pub const X_CODEX_TURN_STATE_HEADER: &str = "x-codex-turn-state";
@@ -198,7 +197,6 @@ fn session_telemetry_for_request(
 ///
 /// This is intentionally kept minimal so `ModelClient` does not need to hold a full `Config`. Most
 /// configuration is per turn and is passed explicitly to streaming/unary methods.
-#[derive(Debug)]
 struct ModelClientState {
     thread_id: ThreadId,
     provider: SharedModelProvider,
@@ -215,6 +213,37 @@ struct ModelClientState {
     disable_websockets: AtomicBool,
     agent_identity_session_fallback: AgentIdentitySessionFallback,
     cached_websocket_session: StdMutex<WebsocketSession>,
+    /// Optional bridged `AuthProvider` derived from the `AuthManager` at construction time.
+    ///
+    /// This is stored so that the API client layer can use it directly without needing to
+    /// reach back into the `ModelProvider` abstraction on every request.
+    api_auth_provider: Option<Arc<dyn codex_wire_protocol::auth::AuthProvider>>,
+}
+
+impl std::fmt::Debug for ModelClientState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ModelClientState")
+            .field("session_id", &self.session_id)
+            .field("thread_id", &self.thread_id)
+            .field("window_generation", &self.window_generation)
+            .field("installation_id", &self.installation_id)
+            .field("provider", &self.provider)
+            .field("auth_env_telemetry", &self.auth_env_telemetry)
+            .field("session_source", &self.session_source)
+            .field("model_verbosity", &self.model_verbosity)
+            .field(
+                "enable_request_compression",
+                &self.enable_request_compression,
+            )
+            .field("include_timing_metrics", &self.include_timing_metrics)
+            .field("beta_features_header", &self.beta_features_header)
+            .field("include_attestation", &self.include_attestation)
+            .field("attestation_provider", &self.attestation_provider.is_some())
+            .field("disable_websockets", &self.disable_websockets)
+            .field("cached_websocket_session", &self.cached_websocket_session)
+            .field("api_auth_provider", &self.api_auth_provider.is_some())
+            .finish()
+    }
 }
 
 /// Resolved API client setup for a single request attempt.
@@ -419,6 +448,12 @@ fn sideband_websocket_auth_headers(api_auth: &dyn AuthProvider) -> ApiHeaderMap 
 }
 
 impl ModelClient {
+    /// Returns a clone of the provider metadata used to construct this client.
+    #[cfg(test)]
+    pub fn provider_info(&self) -> ModelProviderInfo {
+        self.state.provider.info().clone()
+    }
+
     #[allow(clippy::too_many_arguments)]
     /// Creates a new session-scoped `ModelClient`.
     ///
@@ -441,7 +476,7 @@ impl ModelClient {
         attestation_provider: Option<Arc<dyn AttestationProvider>>,
         http_client_factory: HttpClientFactory,
     ) -> Self {
-        let model_provider = create_model_provider(provider_info, auth_manager);
+        let model_provider = create_model_provider(provider_info, auth_manager.clone());
         let codex_api_key_env_enabled = model_provider
             .auth_manager()
             .as_ref()
@@ -449,6 +484,10 @@ impl ModelClient {
         let auth_env_telemetry =
             collect_auth_env_telemetry(model_provider.info(), codex_api_key_env_enabled);
         let include_attestation = model_provider.supports_attestation();
+        // Bridge the AuthManager into a dyn AuthProvider so the API client layer can use it
+        // directly.  This keeps backward compatibility for existing OpenAI auth flows while
+        // letting any provider's auth participate in the new AuthProvider-based path.
+        let api_auth_provider = auth_manager.as_ref().and_then(|am| am.as_auth_provider());
         Self {
             state: Arc::new(ModelClientState {
                 thread_id,
@@ -466,6 +505,7 @@ impl ModelClient {
                 disable_websockets: AtomicBool::new(false),
                 agent_identity_session_fallback: AgentIdentitySessionFallback::default(),
                 cached_websocket_session: StdMutex::new(WebsocketSession::default()),
+                api_auth_provider,
             }),
             agent_identity_policy,
             prompt_cache_key_override: None,

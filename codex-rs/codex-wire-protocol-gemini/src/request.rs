@@ -6,7 +6,6 @@ use codex_wire_protocol::request::ToolSpec;
 use codex_wire_protocol::request::TurnItem;
 use codex_wire_protocol::request::TurnRequest;
 
-use crate::types::Blob;
 use crate::types::Content;
 use crate::types::FunctionCallingConfig;
 use crate::types::FunctionCallingMode;
@@ -40,9 +39,7 @@ pub fn turn_request_to_gemini_request(req: TurnRequest) -> GenerateContentReques
             TurnItem::Image { mime_type, data } => {
                 contents.push(Content {
                     role: Some("user".to_string()),
-                    parts: vec![Part::InlineData {
-                        inline_data: Blob { mime_type, data },
-                    }],
+                    parts: vec![Part::InlineData { mime_type, data }],
                 });
             }
             TurnItem::File { name, content } => {

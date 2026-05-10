@@ -1,6 +1,7 @@
 use std::env;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::OnceLock;
 
 use codex_wire_protocol::{AuthError, AuthToken, AuthType};
 use tracing::warn;
@@ -10,6 +11,7 @@ pub struct ApiKeyAuthProvider {
     provider_id: String,
     env_var: String,
     header_name: String,
+    auth_type_cache: OnceLock<AuthType>,
 }
 
 impl ApiKeyAuthProvider {
@@ -18,6 +20,7 @@ impl ApiKeyAuthProvider {
             provider_id,
             env_var,
             header_name,
+            auth_type_cache: OnceLock::new(),
         }
     }
 }
@@ -28,11 +31,7 @@ impl codex_wire_protocol::AuthProvider for ApiKeyAuthProvider {
     }
 
     fn auth_type(&self) -> &AuthType {
-        // Return a static reference constructed from our fields.
-        // Since AuthType is owned and we need a reference, we use a thread-local
-        // or we can return a new one each call via a Box leak pattern.
-        // For simplicity and correctness in a dyn-compatible trait, we leak a Box.
-        leak_auth_type(AuthType::ApiKey {
+        self.auth_type_cache.get_or_init(|| AuthType::ApiKey {
             env_var: self.env_var.clone(),
             header_name: self.header_name.clone(),
         })
@@ -64,8 +63,4 @@ impl codex_wire_protocol::AuthProvider for ApiKeyAuthProvider {
         warn!(provider_id = %self.provider_id, "revoke is a no-op for ApiKeyAuthProvider");
         Box::pin(async move { Ok(()) })
     }
-}
-
-fn leak_auth_type(auth_type: AuthType) -> &'static AuthType {
-    Box::leak(Box::new(auth_type))
 }

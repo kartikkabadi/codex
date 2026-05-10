@@ -31,7 +31,9 @@ impl std::error::Error for GeminiError {}
 impl From<GeminiError> for codex_wire_protocol::error::WireError {
     fn from(err: GeminiError) -> Self {
         match err {
-            GeminiError::Http(msg) => codex_wire_protocol::error::WireError::Stream(format!("HTTP: {msg}")),
+            GeminiError::Http(msg) => {
+                codex_wire_protocol::error::WireError::Stream(format!("HTTP: {msg}"))
+            }
             GeminiError::Serialization(msg) => {
                 let io_err = std::io::Error::other(msg);
                 codex_wire_protocol::error::WireError::Serialization(serde_json::Error::io(io_err))

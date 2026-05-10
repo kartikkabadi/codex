@@ -180,24 +180,30 @@ impl OssSelectionWidget {
                 {
                     self.send_decision(opt.provider_id.to_string());
                 }
+                self.adjust_scroll();
             }
             KeyCode::Down => {
                 if self.selected_index + 1 < self.filtered_indices.len() {
                     self.selected_index += 1;
                 }
+                self.adjust_scroll();
             }
             KeyCode::PageUp => {
                 self.selected_index = self.selected_index.saturating_sub(10);
+                self.adjust_scroll();
             }
             KeyCode::PageDown => {
                 self.selected_index =
                     (self.selected_index + 10).min(self.filtered_indices.len().saturating_sub(1));
+                self.adjust_scroll();
             }
             KeyCode::Home => {
                 self.selected_index = 0;
+                self.adjust_scroll();
             }
             KeyCode::End => {
                 self.selected_index = self.filtered_indices.len().saturating_sub(1);
+                self.adjust_scroll();
             }
             KeyCode::Enter => {
                 if let Some(id) = self.selected_provider_id() {
@@ -229,6 +235,15 @@ impl OssSelectionWidget {
     fn send_decision(&mut self, selection: String) {
         self.selection = Some(selection);
         self.done = true;
+    }
+
+    fn adjust_scroll(&mut self) {
+        let visible_count = 20; // Approximate visible items
+        if self.selected_index < self.scroll_offset {
+            self.scroll_offset = self.selected_index;
+        } else if self.selected_index >= self.scroll_offset + visible_count {
+            self.scroll_offset = self.selected_index.saturating_sub(visible_count - 1);
+        }
     }
 
     /// Returns `true` once the user has made a decision and the widget no
@@ -296,14 +311,8 @@ impl WidgetRef for OssSelectionWidget {
         let visible_count = list_area.height as usize;
         let total = self.filtered_indices.len();
 
-        // Adjust scroll offset to keep selection visible.
-        let adjusted_scroll = if self.selected_index < self.scroll_offset {
-            self.selected_index
-        } else if self.selected_index >= self.scroll_offset + visible_count {
-            self.selected_index.saturating_sub(visible_count - 1)
-        } else {
-            self.scroll_offset
-        };
+        // Use the pre-computed scroll_offset (updated by adjust_scroll in handle_select_key)
+        let adjusted_scroll = self.scroll_offset;
 
         let mut list_lines: Vec<Line> = Vec::new();
         for i in 0..visible_count {

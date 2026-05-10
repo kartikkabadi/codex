@@ -406,6 +406,11 @@ impl ModelProvider for ConfiguredModelProvider {
                     codex_home,
                     endpoint,
                     self.auth_manager.clone(),
+                    Arc::new(
+                        codex_models_manager::catalogs::generic::GenericModelCatalog::new(
+                            &self.info.name,
+                        ),
+                    ),
                 ))
             }
         }

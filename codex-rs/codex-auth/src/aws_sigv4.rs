@@ -1,16 +1,21 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::OnceLock;
 
 use codex_wire_protocol::{AuthError, AuthToken, AuthType};
 
 /// Stub AWS SigV4 authentication provider.
 pub struct AwsSigV4AuthProvider {
     provider_id: String,
+    auth_type_cache: OnceLock<AuthType>,
 }
 
 impl AwsSigV4AuthProvider {
     pub fn new(provider_id: String) -> Self {
-        Self { provider_id }
+        Self {
+            provider_id,
+            auth_type_cache: OnceLock::new(),
+        }
     }
 }
 
@@ -20,7 +25,7 @@ impl codex_wire_protocol::AuthProvider for AwsSigV4AuthProvider {
     }
 
     fn auth_type(&self) -> &AuthType {
-        leak_auth_type(AuthType::AwsSigV4)
+        self.auth_type_cache.get_or_init(|| AuthType::AwsSigV4)
     }
 
     fn authenticate(&self) -> Pin<Box<dyn Future<Output = Result<AuthToken, AuthError>> + Send>> {
@@ -40,8 +45,4 @@ impl codex_wire_protocol::AuthProvider for AwsSigV4AuthProvider {
     ) -> Pin<Box<dyn Future<Output = Result<(), AuthError>> + Send>> {
         Box::pin(async move { Err(AuthError::Unsupported("AWS SigV4 revoke".to_string())) })
     }
-}
-
-fn leak_auth_type(auth_type: AuthType) -> &'static AuthType {
-    Box::leak(Box::new(auth_type))
 }

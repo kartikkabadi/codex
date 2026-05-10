@@ -74,14 +74,30 @@ impl Stream for GeminiSseStream {
             match self.inner.poll_next_unpin(cx) {
                 Poll::Ready(Some(Ok(chunk))) => {
                     self.buffer.push_str(&String::from_utf8_lossy(&chunk));
-                    if let Some(event) = try_parse_event(&mut self.buffer) {
-                        return Poll::Ready(Some(event));
+                    loop {
+                        let buf_len = self.buffer.len();
+                        if let Some(event) = try_parse_event(&mut self.buffer) {
+                            return Poll::Ready(Some(event));
+                        }
+                        if self.buffer.len() == buf_len {
+                            break;
+                        }
                     }
                 }
                 Poll::Ready(Some(Err(e))) => {
                     return Poll::Ready(Some(Err(GeminiError::Sse(e.to_string()))));
                 }
                 Poll::Ready(None) => {
+                    // Drain all remaining complete events from the buffer.
+                    loop {
+                        let buf_len = self.buffer.len();
+                        if let Some(event) = try_parse_event(&mut self.buffer) {
+                            return Poll::Ready(Some(event));
+                        }
+                        if self.buffer.len() == buf_len {
+                            break;
+                        }
+                    }
                     if !self.buffer.trim().is_empty() {
                         let remainder = self.buffer.clone();
                         self.buffer.clear();
@@ -156,6 +172,13 @@ fn extract_sse_data(buffer: &str) -> Option<(String, String)> {
         if let Some(stripped) = trimmed.strip_prefix("data:") {
             data_lines.push(stripped.trim().to_string());
         }
+    }
+
+    // End of buffer reached. If we have data but no trailing blank line,
+    // return it anyway — the stream may have ended without the final \n\n.
+    if !data_lines.is_empty() {
+        let rest = buffer.split_at(consumed).1.to_string();
+        return Some((data_lines.join("\n"), rest));
     }
 
     None

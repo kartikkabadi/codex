@@ -28,12 +28,14 @@ use crate::sse::process_responses_event;
 use crate::types::ResponseEvent;
 use crate::types::ResponseStream;
 
+#[allow(dead_code)]
 struct WsStream {
     tx_command: mpsc::Sender<WsCommand>,
     rx_message: mpsc::UnboundedReceiver<Result<Message, WsError>>,
     pump_task: tokio::task::JoinHandle<()>,
 }
 
+#[allow(dead_code)]
 enum WsCommand {
     Send {
         message: Message,
@@ -41,6 +43,7 @@ enum WsCommand {
     },
 }
 
+#[allow(dead_code)]
 impl WsStream {
     fn new(inner: WebSocketStream<MaybeTlsStream<TcpStream>>) -> Self {
         let (tx_command, mut rx_command) = mpsc::channel::<WsCommand>(32);
@@ -133,11 +136,14 @@ impl Drop for WsStream {
     }
 }
 
+#[allow(dead_code)]
 const X_CODEX_TURN_STATE_HEADER: &str = "x-codex-turn-state";
 const X_MODELS_ETAG_HEADER: &str = "x-models-etag";
 const X_REASONING_INCLUDED_HEADER: &str = "x-reasoning-included";
 const OPENAI_MODEL_HEADER: &str = "openai-model";
+#[allow(dead_code)]
 const WEBSOCKET_CONNECTION_LIMIT_REACHED_CODE: &str = "websocket_connection_limit_reached";
+#[allow(dead_code)]
 const WEBSOCKET_CONNECTION_LIMIT_REACHED_MESSAGE: &str = "Responses websocket connection limit reached (60 minutes). Create a new websocket connection to continue.";
 
 pub struct ResponsesWebsocketConnection {

@@ -477,7 +477,12 @@ pub fn built_in_model_providers(
         (OPENAI_PROVIDER_ID, openai_provider),
         (
             "azure-openai",
-            preset("Azure OpenAI", None, Some("AZURE_OPENAI_API_KEY"), "openai-responses"),
+            preset(
+                "Azure OpenAI",
+                None,
+                Some("AZURE_OPENAI_API_KEY"),
+                "openai-responses",
+            ),
         ),
         // Protocol: openai-chat-completions
         (
@@ -906,10 +911,7 @@ pub fn built_in_model_providers(
             },
         ),
         // Protocol: bedrock
-        (
-            AMAZON_BEDROCK_PROVIDER_ID,
-            amazon_bedrock_provider,
-        ),
+        (AMAZON_BEDROCK_PROVIDER_ID, amazon_bedrock_provider),
         // Protocol: replicate
         (
             "replicate",
@@ -923,12 +925,7 @@ pub fn built_in_model_providers(
         // Protocol: baseten
         (
             "baseten",
-            preset(
-                "Baseten",
-                None,
-                Some("BASETEN_API_KEY"),
-                "baseten",
-            ),
+            preset("Baseten", None, Some("BASETEN_API_KEY"), "baseten"),
         ),
     ]
     .into_iter()

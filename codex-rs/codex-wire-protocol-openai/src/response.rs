@@ -1,6 +1,7 @@
 // codex-wire-protocol-openai/src/response.rs
 
-use codex_wire_protocol::response::{TurnEvent, TurnStream};
+use codex_wire_protocol::response::TurnEvent;
+use codex_wire_protocol::response::TurnStream;
 
 use crate::types::ResponseEvent;
 
@@ -22,17 +23,22 @@ pub fn response_stream_to_turn_stream(
                 }
                 Err(err) => {
                     let wire_err: codex_wire_protocol::error::WireError = err.into();
-                    let _ = tx.send(TurnEvent::Failed {
-                        error: wire_err.to_string(),
-                        code: None,
-                    }).await;
+                    let _ = tx
+                        .send(TurnEvent::Failed {
+                            error: wire_err.to_string(),
+                            code: None,
+                        })
+                        .await;
                     break;
                 }
             }
         }
     });
 
-    TurnStream { events: rx, turn_id }
+    TurnStream {
+        events: rx,
+        turn_id,
+    }
 }
 
 fn map_response_event(event: ResponseEvent) -> Option<TurnEvent> {
@@ -53,16 +59,12 @@ fn map_response_event(event: ResponseEvent) -> Option<TurnEvent> {
                 arguments: delta,
             })
         }
-        ResponseEvent::OutputItemDone(item) => {
-            map_output_item_done(item)
-        }
-        ResponseEvent::OutputItemAdded(item) => {
-            map_output_item_added(item)
-        }
+        ResponseEvent::OutputItemDone(item) => map_output_item_done(item),
+        ResponseEvent::OutputItemAdded(item) => map_output_item_added(item),
         ResponseEvent::Completed {
             response_id: _,
             token_usage,
-            end_turn: _,
+            end_turn,
         } => {
             if let Some(usage) = token_usage {
                 Some(TurnEvent::Usage {
@@ -71,7 +73,9 @@ fn map_response_event(event: ResponseEvent) -> Option<TurnEvent> {
                     reasoning_tokens: Some(usage.reasoning_output_tokens as u32),
                 })
             } else {
-                Some(TurnEvent::Completed)
+                Some(TurnEvent::Completed {
+                    end_turn: end_turn.unwrap_or(false),
+                })
             }
         }
         ResponseEvent::ServerModel(model) => {
@@ -87,17 +91,13 @@ fn map_response_event(event: ResponseEvent) -> Option<TurnEvent> {
     }
 }
 
-fn map_output_item_done(
-    item: codex_protocol::models::ResponseItem,
-) -> Option<TurnEvent> {
+fn map_output_item_done(item: codex_protocol::models::ResponseItem) -> Option<TurnEvent> {
     match item {
         codex_protocol::models::ResponseItem::Message { role, content, .. } => {
             let text = content
                 .iter()
                 .filter_map(|c| match c {
-                    codex_protocol::models::ContentItem::OutputText { text } => {
-                        Some(text.as_str())
-                    }
+                    codex_protocol::models::ContentItem::OutputText { text } => Some(text.as_str()),
                     _ => None,
                 })
                 .collect::<Vec<_>>()
@@ -113,38 +113,25 @@ fn map_output_item_done(
             name,
             arguments,
             ..
-        } => {
-            Some(TurnEvent::ToolCallCompleted {
-                call_id,
-                name,
-                arguments,
-            })
-        }
+        } => Some(TurnEvent::ToolCallCompleted {
+            call_id,
+            name,
+            arguments,
+        }),
         codex_protocol::models::ResponseItem::FunctionCallOutput {
             call_id, output, ..
-        } => {
-            Some(TurnEvent::ToolResult {
-                call_id,
-                output: output.body.to_text().unwrap_or_default(),
-            })
-        }
+        } => Some(TurnEvent::ToolResult {
+            call_id,
+            output: output.body.to_text().unwrap_or_default(),
+        }),
         _ => None,
     }
 }
 
-fn map_output_item_added(
-    item: codex_protocol::models::ResponseItem,
-) -> Option<TurnEvent> {
+fn map_output_item_added(item: codex_protocol::models::ResponseItem) -> Option<TurnEvent> {
     match item {
-        codex_protocol::models::ResponseItem::FunctionCall {
-            call_id,
-            name,
-            ..
-        } => {
-            Some(TurnEvent::ToolCallStarted {
-                call_id,
-                name,
-            })
+        codex_protocol::models::ResponseItem::FunctionCall { call_id, name, .. } => {
+            Some(TurnEvent::ToolCallStarted { call_id, name })
         }
         _ => None,
     }

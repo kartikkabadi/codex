@@ -123,7 +123,14 @@ pub fn create_protocol(
             let adapter = GeminiWireProtocol::new(base_url);
             Ok(Arc::new(adapter))
         }
-        _ => Err(crate::error::ApiError::UnsupportedProtocol(protocol_id.to_string())),
+        "replicate" => {
+            // Replicate uses an OpenAI-compatible chat completions endpoint
+            let adapter = OpenAiWireProtocol::new(base_url);
+            Ok(Arc::new(adapter))
+        }
+        _ => Err(crate::error::ApiError::UnsupportedProtocol(
+            protocol_id.to_string(),
+        )),
     }
 }
 

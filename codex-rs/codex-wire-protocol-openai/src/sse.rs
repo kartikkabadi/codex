@@ -31,14 +31,16 @@ const OPENAI_MODEL_HEADER: &str = "openai-model";
 const REQUEST_ID_HEADER: &str = "x-request-id";
 const TRUSTED_ACCESS_FOR_CYBER_VERIFICATION: &str = "trusted_access_for_cyber";
 
-pub type ByteStream =
-    Pin<Box<dyn futures::Stream<Item = Result<Bytes, std::io::Error>> + Send>>;
+pub type ByteStream = Pin<Box<dyn futures::Stream<Item = Result<Bytes, std::io::Error>> + Send>>;
 
 /// Telemetry trait for SSE processing.
 pub trait SseTelemetry: Send + Sync {
     fn on_sse_poll(
         &self,
-        response: &Result<Option<Result<eventsource_stream::Event, EventStreamError<std::io::Error>>>, tokio::time::error::Elapsed>,
+        response: &Result<
+            Option<Result<eventsource_stream::Event, EventStreamError<std::io::Error>>>,
+            tokio::time::error::Elapsed,
+        >,
         elapsed: Duration,
     );
 }
@@ -59,8 +61,7 @@ pub fn stream_from_fixture(
     }
 
     let reader = std::io::Cursor::new(content);
-    let stream = ReaderStream::new(reader)
-        .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err.to_string()));
+    let stream = ReaderStream::new(reader).map_err(|err| std::io::Error::other(err.to_string()));
     let (tx_event, rx_event) =
         mpsc::channel::<Result<ResponseEvent, crate::error::OpenAiError>>(1600);
     tokio::spawn(process_sse(

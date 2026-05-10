@@ -1794,7 +1794,7 @@
           "type": "string"
         },
         "experimental_bearer_token": {
-          "description": "Value to use with `Authorization: Bearer <token>` header. Use of this config is discouraged in favor of `env_key` for security reasons, but this may be necessary when using this programmatically.",
+          "description": "Value to use with `Authorization: Bearer *** header. Use of this config is discouraged in favor of `env_key` for security reasons, but this may be necessary when using this programmatically.",
           "type": "string"
         },
         "http_headers": {
@@ -1807,6 +1807,11 @@
         "name": {
           "default": "",
           "description": "Friendly display name.",
+          "type": "string"
+        },
+        "protocol_id": {
+          "default": "",
+          "description": "Protocol identifier used to select the API client implementation.",
           "type": "string"
         },
         "query_params": {

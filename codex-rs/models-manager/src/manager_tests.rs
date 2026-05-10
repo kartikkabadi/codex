@@ -5,6 +5,7 @@ use crate::cache::ModelsCache;
 use crate::cache::ModelsCacheEntry;
 use crate::cache::ModelsCacheError;
 use crate::cache::ModelsCacheFuture;
+use crate::catalogs::generic::GenericModelCatalog;
 use chrono::Utc;
 use codex_http_client::HttpClientFactory;
 use codex_http_client::OutboundProxyPolicy;
@@ -302,7 +303,12 @@ fn openai_manager_for_tests_with_auth(
     endpoint_client: Arc<dyn ModelsEndpointClient>,
     auth_manager: Option<Arc<AuthManager>>,
 ) -> OpenAiModelsManager {
-    OpenAiModelsManager::new(codex_home, endpoint_client, auth_manager)
+    OpenAiModelsManager::new(
+        codex_home,
+        endpoint_client,
+        auth_manager,
+        Arc::new(GenericModelCatalog::new("test")),
+    )
 }
 
 async fn mutate_file_cache_for_test<F>(codex_home: &Path, f: F)

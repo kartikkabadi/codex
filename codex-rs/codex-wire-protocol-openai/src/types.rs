@@ -6,7 +6,8 @@ use std::task::Context;
 use std::task::Poll;
 
 use futures::Stream;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
@@ -207,10 +208,8 @@ pub enum ResponsesWsRequest {
     ResponseProcessed(ResponseProcessedWsRequest),
 }
 
-pub const WS_REQUEST_HEADER_TRACEPARENT_CLIENT_METADATA_KEY: &str =
-    "ws_request_header_traceparent";
-pub const WS_REQUEST_HEADER_TRACESTATE_CLIENT_METADATA_KEY: &str =
-    "ws_request_header_tracestate";
+pub const WS_REQUEST_HEADER_TRACEPARENT_CLIENT_METADATA_KEY: &str = "ws_request_header_traceparent";
+pub const WS_REQUEST_HEADER_TRACESTATE_CLIENT_METADATA_KEY: &str = "ws_request_header_tracestate";
 
 /// Augments client metadata with W3C trace context headers.
 pub fn response_create_client_metadata(

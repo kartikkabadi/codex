@@ -1,4 +1,5 @@
 use chrono::Utc;
+use codex_wire_protocol::AuthProvider;
 use http::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
@@ -36,6 +37,7 @@ use super::agent_identity::record_needs_task_registration;
 use super::agent_identity::register_managed_chatgpt_agent_identity;
 use super::agent_identity::require_agent_identity_authapi_base_url;
 use super::agent_identity::verified_record_from_jwt;
+use super::CodexAuthBridge;
 use super::external_bearer::BearerTokenRefresher;
 use super::revoke::revoke_auth_tokens;
 use super::workload_identity::WorkloadIdentityExternalAuth;
@@ -163,6 +165,12 @@ impl PartialEq for CodexAuth {
 #[derive(Debug, Clone)]
 pub struct ApiKeyAuth {
     api_key: String,
+}
+
+impl ApiKeyAuth {
+    pub fn api_key(&self) -> &str {
+        &self.api_key
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2272,6 +2280,16 @@ impl AuthManager {
     /// Subscribes to cached auth changes that can affect request recovery.
     pub fn auth_change_receiver(&self) -> watch::Receiver<u64> {
         self.auth_change_tx.subscribe()
+    }
+
+    /// Returns a `dyn AuthProvider` backed by the currently cached `CodexAuth`.
+    ///
+    /// This is a compatibility bridge so that callers needing `AuthProvider`
+    /// (e.g. `codex-core`) can obtain one without changing the 66+ existing
+    /// `CodexAuth` call sites.
+    pub fn as_auth_provider(&self) -> Option<Arc<dyn AuthProvider>> {
+        self.auth_cached()
+            .map(|auth| Arc::new(CodexAuthBridge::new(auth)) as Arc<dyn AuthProvider>)
     }
 
     pub fn refresh_failure_for_auth(&self, auth: &CodexAuth) -> Option<RefreshTokenFailedError> {

@@ -16,7 +16,8 @@ pub fn response_stream_to_turn_stream(sse_stream: GeminiSseStream, turn_id: Stri
         while let Some(result) = rx_sse.recv().await {
             match result {
                 Ok(event) => {
-                    if let Some(turn_event) = map_sse_event(event) {
+                    let turn_events = map_sse_event(event);
+                    for turn_event in turn_events {
                         if tx.send(turn_event).await.is_err() {
                             break;
                         }
@@ -42,7 +43,7 @@ pub fn response_stream_to_turn_stream(sse_stream: GeminiSseStream, turn_id: Stri
     }
 }
 
-fn map_sse_event(event: SseEvent) -> Option<TurnEvent> {
+fn map_sse_event(event: SseEvent) -> Vec<TurnEvent> {
     match event {
         SseEvent::Candidate {
             content,
@@ -54,11 +55,11 @@ fn map_sse_event(event: SseEvent) -> Option<TurnEvent> {
                     crate::types::Part::Text { text } => {
                         events.push(TurnEvent::ContentDelta { text });
                     }
-                    crate::types::Part::FunctionCall { function_call } => {
+                    crate::types::Part::FunctionCall { name, args } => {
                         events.push(TurnEvent::ToolCallCompleted {
-                            call_id: function_call.name.clone(),
-                            name: function_call.name,
-                            arguments: function_call.args.to_string(),
+                            call_id: name.clone(),
+                            name,
+                            arguments: args.to_string(),
                         });
                     }
                     _ => {}
@@ -67,18 +68,15 @@ fn map_sse_event(event: SseEvent) -> Option<TurnEvent> {
             if finish_reason.as_deref() == Some("STOP") {
                 events.push(TurnEvent::Completed { end_turn: true });
             }
-            // Return the first event; caller should ideally batch, but
-            // TurnStream only yields one at a time. For simplicity emit
-            // content delta if present, otherwise completed.
-            events.into_iter().next()
+            events
         }
         SseEvent::Usage {
             prompt_tokens,
             completion_tokens,
-        } => Some(TurnEvent::Usage {
+        } => vec![TurnEvent::Usage {
             input_tokens: prompt_tokens,
             output_tokens: completion_tokens,
             reasoning_tokens: None,
-        }),
+        }],
     }
 }

@@ -11,3 +11,6 @@ pub mod sse;
 pub mod types;
 
 pub use protocol::GeminiWireProtocol;
+
+#[cfg(test)]
+mod protocol_tests;
