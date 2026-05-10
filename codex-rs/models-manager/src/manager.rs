@@ -1,4 +1,5 @@
 use super::cache::ModelsCacheManager;
+use crate::catalog::ModelCatalog;
 use crate::collaboration_mode_presets::builtin_collaboration_mode_presets;
 use crate::config::ModelsManagerConfig;
 use crate::model_info;
@@ -183,6 +184,7 @@ pub struct OpenAiModelsManager {
     cache_manager: ModelsCacheManager,
     endpoint_client: SharedModelsEndpointClient,
     auth_manager: Option<Arc<AuthManager>>,
+    catalog: Arc<dyn ModelCatalog>,
 }
 
 /// Static model manager backed by an authoritative in-process catalog.
@@ -198,6 +200,7 @@ impl OpenAiModelsManager {
         codex_home: PathBuf,
         endpoint_client: Arc<dyn ModelsEndpointClient>,
         auth_manager: Option<Arc<AuthManager>>,
+        catalog: Arc<dyn ModelCatalog>,
     ) -> Self {
         let cache_path = codex_home.join(MODEL_CACHE_FILE);
         let cache_manager = ModelsCacheManager::new(cache_path, DEFAULT_MODEL_CACHE_TTL);
@@ -208,6 +211,7 @@ impl OpenAiModelsManager {
             cache_manager,
             endpoint_client,
             auth_manager,
+            catalog,
         }
     }
 }
@@ -228,9 +232,10 @@ impl ModelsManager for OpenAiModelsManager {
         if let Err(err) = self.refresh_available_models(refresh_strategy).await {
             error!("failed to refresh available models: {err}");
         }
-        ModelsResponse {
-            models: self.get_remote_models().await,
-        }
+        let mut models = self.catalog.bundled_models();
+        let remote = self.get_remote_models().await;
+        models.extend(remote);
+        ModelsResponse { models }
     }
 
     async fn get_remote_models(&self) -> Vec<ModelInfo> {
