@@ -129,6 +129,7 @@ pub fn map_api_error(err: ApiError) -> CodexErr {
             }
         },
         ApiError::RateLimit(msg) => CodexErr::Stream(msg, None),
+        ApiError::UnsupportedProtocol(msg) => CodexErr::InvalidRequest(msg),
     }
 }
 
