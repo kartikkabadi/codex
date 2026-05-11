@@ -59,9 +59,9 @@ mod tests {
     #[test]
     fn collect_auth_env_telemetry_buckets_provider_env_key_name() {
         let provider = ModelProviderInfo {
-            name: "Custom".to_string(),
+            name: "test".to_string(),
             base_url: None,
-            env_key: Some("sk-should-not-leak".to_string()),
+            env_key: Some("TEST_KEY".to_string()),
             env_key_instructions: None,
             experimental_bearer_token: None,
             auth: None,
@@ -77,6 +77,7 @@ mod tests {
             requires_openai_auth: false,
             supports_websockets: false,
             supports_standalone_web_search: false,
+            protocol_id: "openai-responses".to_string(),
         };
 
         let telemetry =

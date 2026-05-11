@@ -16,6 +16,7 @@ use codex_protocol::openai_models::default_input_modalities;
 use http::HeaderMap;
 use http::Method;
 use std::sync::Arc;
+use std::time::Duration;
 use wiremock::Mock;
 use wiremock::MockServer;
 use wiremock::ResponseTemplate;
@@ -43,6 +44,7 @@ fn provider(base_url: &str) -> Provider {
             retry_transport: true,
         },
         stream_idle_timeout: std::time::Duration::from_secs(1),
+        protocol_id: "openai-responses".to_string(),
     }
 }
 

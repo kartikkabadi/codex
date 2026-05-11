@@ -2358,7 +2358,7 @@ fn prompt_with_input_and_instructions(input: Vec<ResponseItem>, instructions: &s
 }
 
 fn websocket_provider(server: &WebSocketTestServer) -> ModelProviderInfo {
-    websocket_provider_with_connect_timeout(server, /*websocket_connect_timeout_ms*/ None)
+    websocket_provider_with_connect_timeout(server, None)
 }
 
 fn websocket_provider_with_connect_timeout(
@@ -2366,7 +2366,7 @@ fn websocket_provider_with_connect_timeout(
     websocket_connect_timeout_ms: Option<u64>,
 ) -> ModelProviderInfo {
     ModelProviderInfo {
-        name: "mock-ws".into(),
+        name: "websocket-mock".into(),
         base_url: Some(format!("{}/v1", server.uri())),
         env_key: None,
         env_key_instructions: None,
@@ -2384,6 +2384,7 @@ fn websocket_provider_with_connect_timeout(
         requires_openai_auth: false,
         supports_websockets: true,
         supports_standalone_web_search: false,
+        protocol_id: "openai-responses".to_string(),
     }
 }
 

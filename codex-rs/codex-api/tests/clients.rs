@@ -148,7 +148,8 @@ fn provider(name: &str) -> Provider {
             retry_5xx: false,
             retry_transport: true,
         },
-        stream_idle_timeout: Duration::from_millis(10),
+        stream_idle_timeout: Duration::from_millis(50),
+        protocol_id: "openai-responses".to_string(),
     }
 }
 

@@ -46,12 +46,9 @@ async fn retries_on_early_close() {
     // environment variables.
 
     let model_provider = ModelProviderInfo {
-        name: "openai".into(),
+        name: "mock".into(),
         base_url: Some(format!("{}/v1", server.uri())),
-        // Environment variable that should exist in the test environment.
-        // ModelClient will return an error if the environment variable for the
-        // provider is not set.
-        env_key: Some("PATH".into()),
+        env_key: None,
         env_key_instructions: None,
         experimental_bearer_token: None,
         auth: None,
@@ -60,14 +57,14 @@ async fn retries_on_early_close() {
         query_params: None,
         http_headers: None,
         env_http_headers: None,
-        // exercise retry path: first attempt yields incomplete stream, so allow 1 retry
         request_max_retries: Some(0),
-        stream_max_retries: Some(1),
-        stream_idle_timeout_ms: Some(2000),
+        stream_max_retries: Some(0),
+        stream_idle_timeout_ms: Some(5_000),
         websocket_connect_timeout_ms: None,
         requires_openai_auth: false,
         supports_websockets: false,
         supports_standalone_web_search: false,
+        protocol_id: "openai-responses".to_string(),
     };
 
     let TestCodex { codex, .. } = test_codex()

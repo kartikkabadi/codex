@@ -65,12 +65,13 @@ fn test_provider(base_url: String) -> Provider {
         headers: HeaderMap::new(),
         retry: RetryConfig {
             max_attempts: 1,
-            base_delay: Duration::from_millis(1),
+            base_delay: std::time::Duration::from_millis(1),
             retry_429: false,
             retry_5xx: false,
             retry_transport: false,
         },
-        stream_idle_timeout: Duration::from_secs(5),
+        stream_idle_timeout: std::time::Duration::from_secs(5),
+        protocol_id: "openai-responses".to_string(),
     }
 }
 
