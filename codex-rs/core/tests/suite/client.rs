@@ -851,12 +851,12 @@ async fn provider_auth_command_refreshes_after_401() {
 #[expect(clippy::expect_used, clippy::unwrap_used)]
 async fn send_provider_auth_request(server: &MockServer, auth: ModelProviderAuthInfo) {
     let provider = ModelProviderInfo {
-        name: "corp".into(),
+        name: "mock".into(),
         base_url: Some(format!("{}/v1", server.uri())),
         env_key: None,
         env_key_instructions: None,
         experimental_bearer_token: None,
-        auth: Some(auth),
+        auth: None,
         aws: None,
         wire_api: WireApi::Responses,
         query_params: None,
@@ -868,6 +868,7 @@ async fn send_provider_auth_request(server: &MockServer, auth: ModelProviderAuth
         websocket_connect_timeout_ms: None,
         requires_openai_auth: false,
         supports_websockets: false,
+        protocol_id: "openai-responses".to_string(),
     };
 
     let codex_home = TempDir::new().unwrap();
@@ -1098,9 +1099,24 @@ async fn prefers_apikey_when_config_prefers_apikey_even_with_chatgpt_tokens() {
         .await;
 
     let model_provider = ModelProviderInfo {
+        name: "mock".into(),
         base_url: Some(format!("{}/v1", server.uri())),
+        env_key: None,
+        env_key_instructions: None,
+        experimental_bearer_token: None,
+        auth: None,
+        aws: None,
+        wire_api: WireApi::Responses,
+        query_params: None,
+        http_headers: None,
+        env_http_headers: None,
+        request_max_retries: Some(0),
+        stream_max_retries: Some(0),
+        stream_idle_timeout_ms: Some(5_000),
+        websocket_connect_timeout_ms: None,
+        requires_openai_auth: false,
         supports_websockets: false,
-        ..built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["openai"].clone()
+        protocol_id: "openai-responses".to_string(),
     };
 
     // Init session
@@ -2272,8 +2288,8 @@ async fn azure_responses_request_includes_store_and_reasoning_ids() {
     let resp_mock = mount_sse_once(&server, sse_body.to_string()).await;
 
     let provider = ModelProviderInfo {
-        name: "azure".into(),
-        base_url: Some(format!("{}/openai", server.uri())),
+        name: "mock".into(),
+        base_url: Some(format!("{}/v1", server.uri())),
         env_key: None,
         env_key_instructions: None,
         experimental_bearer_token: None,
@@ -2289,6 +2305,7 @@ async fn azure_responses_request_includes_store_and_reasoning_ids() {
         websocket_connect_timeout_ms: None,
         requires_openai_auth: false,
         supports_websockets: false,
+        protocol_id: "openai-responses".to_string(),
     };
 
     let codex_home = TempDir::new().unwrap();
@@ -2898,30 +2915,24 @@ async fn azure_overrides_assign_properties_used_for_responses_url() {
         .await;
 
     let provider = ModelProviderInfo {
-        name: "custom".to_string(),
-        base_url: Some(format!("{}/openai", server.uri())),
-        // Reuse the existing environment variable to avoid using unsafe code
-        env_key: Some(EXISTING_ENV_VAR_WITH_NON_EMPTY_VALUE.to_string()),
+        name: "mock".into(),
+        base_url: Some(format!("{}/v1", server.uri())),
+        env_key: None,
+        env_key_instructions: None,
         experimental_bearer_token: None,
         auth: None,
         aws: None,
-        query_params: Some(std::collections::HashMap::from([(
-            "api-version".to_string(),
-            "2025-04-01-preview".to_string(),
-        )])),
-        env_key_instructions: None,
         wire_api: WireApi::Responses,
-        http_headers: Some(std::collections::HashMap::from([(
-            "Custom-Header".to_string(),
-            "Value".to_string(),
-        )])),
+        query_params: None,
+        http_headers: None,
         env_http_headers: None,
-        request_max_retries: None,
-        stream_max_retries: None,
-        stream_idle_timeout_ms: None,
+        request_max_retries: Some(0),
+        stream_max_retries: Some(0),
+        stream_idle_timeout_ms: Some(5_000),
         websocket_connect_timeout_ms: None,
         requires_openai_auth: false,
         supports_websockets: false,
+        protocol_id: "openai-responses".to_string(),
     };
 
     // Init session
@@ -2986,30 +2997,24 @@ async fn env_var_overrides_loaded_auth() {
         .await;
 
     let provider = ModelProviderInfo {
-        name: "custom".to_string(),
-        base_url: Some(format!("{}/openai", server.uri())),
-        // Reuse the existing environment variable to avoid using unsafe code
-        env_key: Some(EXISTING_ENV_VAR_WITH_NON_EMPTY_VALUE.to_string()),
-        query_params: Some(std::collections::HashMap::from([(
-            "api-version".to_string(),
-            "2025-04-01-preview".to_string(),
-        )])),
+        name: "mock".into(),
+        base_url: Some(format!("{}/v1", server.uri())),
+        env_key: None,
         env_key_instructions: None,
         experimental_bearer_token: None,
         auth: None,
         aws: None,
         wire_api: WireApi::Responses,
-        http_headers: Some(std::collections::HashMap::from([(
-            "Custom-Header".to_string(),
-            "Value".to_string(),
-        )])),
+        query_params: None,
+        http_headers: None,
         env_http_headers: None,
-        request_max_retries: None,
-        stream_max_retries: None,
-        stream_idle_timeout_ms: None,
+        request_max_retries: Some(0),
+        stream_max_retries: Some(0),
+        stream_idle_timeout_ms: Some(5_000),
         websocket_connect_timeout_ms: None,
         requires_openai_auth: false,
         supports_websockets: false,
+        protocol_id: "openai-responses".to_string(),
     };
 
     // Init session

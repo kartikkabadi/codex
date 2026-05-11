@@ -561,13 +561,13 @@ mod thread_processor_behavior_tests {
         let temp_dir = TempDir::new()?;
         let session_provider = ModelProviderInfo {
             name: "session".to_string(),
-            base_url: Some("http://127.0.0.1:8061/api/codex".to_string()),
+            base_url: Some("http://127.0.0.1:9999/api/codex".to_string()),
             env_key: None,
             env_key_instructions: None,
             experimental_bearer_token: None,
             auth: None,
             aws: None,
-            wire_api: WireApi::Responses,
+            wire_api: codex_model_provider_info::WireApi::Responses,
             query_params: None,
             http_headers: None,
             env_http_headers: None,
@@ -576,7 +576,8 @@ mod thread_processor_behavior_tests {
             stream_idle_timeout_ms: None,
             websocket_connect_timeout_ms: None,
             requires_openai_auth: false,
-            supports_websockets: true,
+            supports_websockets: false,
+            protocol_id: "openai-responses".to_string(),
         };
         let config_manager = ConfigManager::new(
             temp_dir.path().to_path_buf(),
