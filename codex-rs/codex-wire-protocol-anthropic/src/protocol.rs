@@ -21,15 +21,13 @@ use crate::types::MessagesRequest;
 pub struct AnthropicWireProtocol {
     http_client: Client,
     api_provider: String,
-    auth_token: String,
 }
 
 impl AnthropicWireProtocol {
-    pub fn new(api_provider: String, auth_token: String) -> Self {
+    pub fn new(api_provider: String, _auth_token: String) -> Self {
         Self {
             http_client: Client::new(),
             api_provider,
-            auth_token,
         }
     }
 

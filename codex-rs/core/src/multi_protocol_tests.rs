@@ -4,8 +4,6 @@
 //! providers (Anthropic, Gemini) and that `codex_api::create_protocol` dispatches
 //! to the correct wire-protocol adapter without performing real network I/O.
 
-use std::sync::Arc;
-
 use codex_api::ApiError;
 use codex_api::create_protocol;
 use codex_model_provider_info::ModelProviderInfo;

@@ -58,6 +58,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+      - name: Setup Socket Firewall
+        uses: socketdev/action@2d3f25590c6ed6ba11a9a14c064d962a3a04698f # v1.3.1
+        with:
+          mode: firewall-free
+
       - uses: dtolnay/rust-toolchain@a0b273b48ed29de4470960879e8381ff45632f26 # 1.93.0
         with:
           toolchain: nightly-2025-09-18
@@ -85,7 +90,7 @@ jobs:
         run: python3 -m unittest discover -s tools/argument-comment-lint -p 'test_*.py'
       - name: Test argument comment lint package
         working-directory: tools/argument-comment-lint
-        run: cargo test
+        run: sfw cargo test
         env:
           RUST_MIN_STACK: "8388608" # 8 MiB
 
@@ -248,6 +253,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+      - name: Setup Socket Firewall
+        uses: socketdev/action@2d3f25590c6ed6ba11a9a14c064d962a3a04698f # v1.3.1
+        with:
+          mode: firewall-free
+
       - name: Install Linux build dependencies
         if: ${{ runner.os == 'Linux' }}
         shell: bash
@@ -459,7 +469,7 @@ jobs:
           cargo chef cook --recipe-path "$RECIPE" --target ${{ matrix.target }} --release
 
       - name: cargo clippy
-        run: cargo clippy --target ${{ matrix.target }} --tests --profile ${{ matrix.profile }} --timings -- -D warnings
+        run: sfw cargo clippy --target ${{ matrix.target }} --tests --profile ${{ matrix.profile }} --timings -- -D warnings
 
       - name: Upload Cargo timings (clippy)
         if: always()
@@ -576,6 +586,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+      - name: Setup Socket Firewall
+        uses: socketdev/action@2d3f25590c6ed6ba11a9a14c064d962a3a04698f # v1.3.1
+        with:
+          mode: firewall-free
+
       - name: Install Linux build dependencies
         if: ${{ runner.os == 'Linux' }}
         shell: bash
@@ -682,7 +697,7 @@ jobs:
 
       - name: tests
         id: test
-        run: cargo nextest run --no-fail-fast --target ${{ matrix.target }} --cargo-profile ci-test --timings
+        run: sfw cargo nextest run --no-fail-fast --target ${{ matrix.target }} --cargo-profile ci-test --timings
         env:
           RUST_BACKTRACE: 1
           RUST_MIN_STACK: "8388608" # 8 MiB

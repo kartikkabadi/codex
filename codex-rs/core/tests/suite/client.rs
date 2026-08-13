@@ -856,7 +856,7 @@ async fn send_provider_auth_request(server: &MockServer, auth: ModelProviderAuth
         env_key: None,
         env_key_instructions: None,
         experimental_bearer_token: None,
-        auth: None,
+        auth: Some(auth),
         aws: None,
         wire_api: WireApi::Responses,
         query_params: None,

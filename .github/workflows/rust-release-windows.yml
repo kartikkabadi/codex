@@ -86,6 +86,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+      - name: Setup Socket Firewall
+        uses: socketdev/action@2d3f25590c6ed6ba11a9a14c064d962a3a04698f # v1.3.1
+        with:
+          mode: firewall-free
+
       - name: Print runner specs (Windows)
         shell: powershell
         run: |
@@ -111,7 +116,7 @@ jobs:
           for binary in ${{ matrix.binaries }}; do
             build_args+=(--bin "$binary")
           done
-          cargo build --target ${{ matrix.target }} --release --timings "${build_args[@]}"
+          sfw cargo build --target ${{ matrix.target }} --release --timings "${build_args[@]}"
 
       - name: Upload Cargo timings
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0

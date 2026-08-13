@@ -112,6 +112,7 @@ use crate::client_common::ResponseEvent;
 use crate::client_common::ResponseStream;
 use crate::feedback_tags;
 use crate::flags::CODEX_RS_SSE_FIXTURE;
+use crate::native_protocol;
 use crate::util::emit_feedback_auth_recovery_tags;
 use codex_api::map_api_error;
 use codex_feedback::FeedbackRequestTags;
@@ -804,6 +805,10 @@ impl ModelClient {
         Ok(request)
     }
 
+    fn native_protocol_enabled(&self) -> bool {
+        native_protocol::supported_protocol_id(&self.state.provider.info().protocol_id)
+    }
+
     /// Returns whether the Responses-over-WebSocket transport is active for this session.
     ///
     /// WebSocket use is controlled by provider capability and session-scoped fallback state.
@@ -1360,6 +1365,36 @@ impl ModelClientSession {
         }
     }
 
+    async fn stream_native_protocol(
+        &self,
+        prompt: &Prompt,
+        model_info: &ModelInfo,
+        _session_telemetry: &SessionTelemetry,
+        effort: Option<ReasoningEffortConfig>,
+    ) -> Result<ResponseStream> {
+        let client_setup = self.client.current_client_setup().await?;
+        let provider_info = self.client.state.provider.info();
+        let protocol = codex_api::create_protocol(
+            &provider_info.protocol_id,
+            client_setup.api_provider.base_url.clone(),
+        )
+        .map_err(map_api_error)?;
+        let api_client = codex_api::ApiClient::new(protocol);
+        let auth =
+            native_protocol::auth_token_for_provider(client_setup.auth.as_ref(), provider_info)?;
+        let request = native_protocol::build_turn_request(
+            prompt,
+            model_info,
+            effort,
+            &self.client.state.installation_id,
+        )?;
+        let turn_stream = api_client
+            .stream_turn(request, auth)
+            .await
+            .map_err(native_protocol::map_wire_error)?;
+        Ok(native_protocol::map_turn_stream(turn_stream))
+    }
+
     /// Streams a turn via the Responses API over WebSocket transport.
     #[allow(clippy::too_many_arguments)]
     #[instrument(
@@ -1612,6 +1647,12 @@ impl ModelClientSession {
         let wire_api = self.client.state.provider.info().wire_api;
         match wire_api {
             WireApi::Responses => {
+                if self.client.native_protocol_enabled() {
+                    return self
+                        .stream_native_protocol(prompt, model_info, session_telemetry, effort)
+                        .await;
+                }
+
                 if self.client.responses_websocket_enabled() {
                     let request_trace = current_span_w3c_trace_context();
                     match self

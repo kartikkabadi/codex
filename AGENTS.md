@@ -217,3 +217,17 @@ These guidelines apply to app-server protocol work in `codex-rs`, especially:
 - Validate with `cargo test -p codex-app-server-protocol`.
 - Avoid boilerplate tests that only assert experimental field markers for individual
   request fields in `common.rs`; rely on schema generation/tests and behavioral coverage instead.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked as local markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The default mattpocock/skills triage labels are used unchanged. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repo uses a single-context domain docs layout. See `docs/agents/domain.md`.

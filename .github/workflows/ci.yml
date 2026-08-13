@@ -17,6 +17,11 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
+      - name: Setup Socket Firewall
+        uses: socketdev/action@2d3f25590c6ed6ba11a9a14c064d962a3a04698f # v1.3.1
+        with:
+          mode: firewall-free
+
       - name: Verify codex-rs Cargo manifests inherit workspace settings
         run: python3 .github/scripts/verify_cargo_workspace_manifests.py
 
@@ -37,7 +42,7 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: sfw pnpm install --frozen-lockfile
 
       # stage_npm_packages.py requires DotSlash when staging releases.
       - uses: facebook/install-dotslash@1e4e7b3e07eaca387acb98f1d4720e0bee8dbb6a # v2

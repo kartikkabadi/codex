@@ -60,6 +60,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup Socket Firewall
+        uses: socketdev/action@2d3f25590c6ed6ba11a9a14c064d962a3a04698f # v1.3.1
+        with:
+          mode: firewall-free
+
       - uses: dtolnay/rust-toolchain@a0b273b48ed29de4470960879e8381ff45632f26 # 1.93.0
         with:
           toolchain: nightly-2025-09-18
@@ -77,7 +82,7 @@ jobs:
       - name: Cargo build
         working-directory: tools/argument-comment-lint
         shell: bash
-        run: cargo build --release --target ${{ matrix.target }}
+        run: sfw cargo build --release --target ${{ matrix.target }}
 
       - name: Stage artifact
         shell: bash

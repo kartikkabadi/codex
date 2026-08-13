@@ -485,6 +485,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup Socket Firewall
+        uses: socketdev/action@2d3f25590c6ed6ba11a9a14c064d962a3a04698f # v1.3.1
+        with:
+          mode: firewall-free
+
       - name: Generate release notes from tag commit message
         id: release_notes
         shell: bash
@@ -565,7 +570,7 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: sfw pnpm install --frozen-lockfile
 
       # stage_npm_packages.py requires DotSlash when staging releases.
       - uses: facebook/install-dotslash@1e4e7b3e07eaca387acb98f1d4720e0bee8dbb6a # v2

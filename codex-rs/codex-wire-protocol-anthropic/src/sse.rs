@@ -80,13 +80,9 @@ struct SseMessage {
 #[derive(Debug, Deserialize)]
 struct SseContentBlock {
     #[serde(default)]
-    index: Option<usize>,
-    #[serde(default)]
     id: Option<String>,
     #[serde(default)]
     name: Option<String>,
-    #[serde(default)]
-    input: Option<serde_json::Value>,
 }
 
 /// A stream of raw bytes from the HTTP response body.

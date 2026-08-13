@@ -10,6 +10,8 @@ use super::X_OPENAI_SUBAGENT_HEADER;
 use crate::AttestationContext;
 use crate::AttestationProvider;
 use crate::GenerateAttestationFuture;
+use crate::Prompt;
+use crate::native_protocol;
 use codex_api::ApiError;
 use codex_api::ResponseEvent;
 use codex_app_server_protocol::AuthMode;
@@ -78,6 +80,27 @@ fn test_model_client(session_source: SessionSource) -> ModelClient {
     )
 }
 
+fn test_native_model_client(protocol_id: &str) -> ModelClient {
+    let mut provider =
+        create_oss_provider_with_base_url("https://example.com/v1", WireApi::Responses);
+    provider.name = "Native provider".to_string();
+    provider.protocol_id = protocol_id.to_string();
+    let thread_id = ThreadId::new();
+    ModelClient::new(
+        /*auth_manager*/ None,
+        thread_id.into(),
+        thread_id,
+        /*installation_id*/ "11111111-1111-4111-8111-111111111111".to_string(),
+        provider,
+        SessionSource::Cli,
+        /*model_verbosity*/ None,
+        /*enable_request_compression*/ false,
+        /*include_timing_metrics*/ false,
+        /*beta_features_header*/ None,
+        /*attestation_provider*/ None,
+    )
+}
+
 fn test_model_info() -> ModelInfo {
     serde_json::from_value(json!({
         "slug": "gpt-test",
@@ -121,6 +144,82 @@ fn test_session_telemetry() -> SessionTelemetry {
         "test-terminal".to_string(),
         SessionSource::Cli,
     )
+}
+
+#[test]
+fn native_protocol_enabled_only_for_supported_protocol_ids() {
+    assert!(test_native_model_client("anthropic-messages").native_protocol_enabled());
+    assert!(test_native_model_client("gemini").native_protocol_enabled());
+    assert!(!test_native_model_client("openai-responses").native_protocol_enabled());
+    assert!(!test_native_model_client("openai-chat-completions").native_protocol_enabled());
+}
+
+#[test]
+fn build_turn_request_carries_instructions_messages_and_text_tools() {
+    let mut prompt = Prompt::default();
+    prompt.base_instructions.text = "System instructions".to_string();
+    prompt.input.push(ResponseItem::Message {
+        id: None,
+        role: "user".to_string(),
+        content: vec![ContentItem::InputText {
+            text: "Hello".to_string(),
+        }],
+        phase: None,
+    });
+    prompt.tools.push(codex_tools::ToolSpec::Function(
+        codex_tools::ResponsesApiTool {
+            name: "lookup".to_string(),
+            description: "Look something up".to_string(),
+            strict: false,
+            defer_loading: None,
+            parameters: codex_tools::JsonSchema::object(Default::default(), None, None),
+            output_schema: None,
+        },
+    ));
+
+    let request = native_protocol::build_turn_request(
+        &prompt,
+        &test_model_info(),
+        None,
+        "11111111-1111-4111-8111-111111111111",
+    )
+    .expect("turn request should build");
+
+    assert_eq!(request.model, "gpt-test");
+    assert_eq!(request.instructions, "System instructions");
+    assert_eq!(request.input.len(), 2);
+    assert_eq!(request.tools.len(), 1);
+    assert_eq!(request.tools[0].name, "lookup");
+}
+
+#[test]
+fn turn_event_mapping_preserves_tool_call_completion() {
+    let mapped = native_protocol::turn_event_to_response_event(
+        codex_wire_protocol::TurnEvent::ToolCallCompleted {
+            call_id: "call-1".to_string(),
+            name: "shell".to_string(),
+            arguments: "{\"cmd\":\"pwd\"}".to_string(),
+        },
+    )
+    .expect("tool call event should map")
+    .expect("mapping should succeed");
+
+    match mapped {
+        ResponseEvent::OutputItemDone(ResponseItem::FunctionCall {
+            id,
+            name,
+            namespace,
+            arguments,
+            call_id,
+        }) => {
+            assert_eq!(id, None);
+            assert_eq!(name, "shell");
+            assert_eq!(namespace, None);
+            assert_eq!(arguments, "{\"cmd\":\"pwd\"}");
+            assert_eq!(call_id, "call-1");
+        }
+        other => panic!("expected function call output item, got {other:?}"),
+    }
 }
 
 #[derive(Default)]

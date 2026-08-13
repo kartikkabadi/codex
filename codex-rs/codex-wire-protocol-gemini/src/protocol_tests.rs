@@ -88,6 +88,7 @@ async fn test_stream_turn_returns_content_delta() {
 
     assert!(found_any, "expected at least one event from the stream");
     assert!(found_content, "expected ContentDelta with 'Hello'");
+    assert!(found_completed, "expected Completed event");
     // Note: Gemini API returns content and finishReason in the same SSE event.
     // Our adapter only emits the first event (ContentDelta), so Completed is not
     // separately emitted. This is a known limitation of the current architecture.
