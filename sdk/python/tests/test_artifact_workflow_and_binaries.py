@@ -1092,3 +1092,85 @@ def test_broken_runtime_package_does_not_fall_back() -> None:
         client_module.resolve_codex_bin(client_module.CodexConfig(), ops)
 
     assert str(exc_info.value) == ("missing packaged binary")
+
+
+def test_runtime_asset_metadata_cannot_choose_authenticated_download_host(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    runtime_setup = _load_runtime_setup_module()
+    requests: list[str] = []
+    asset_name = runtime_setup.platform_asset_name()
+
+    def fake_urlopen(request):
+        requests.append(request.full_url)
+        if len(requests) == 1:
+            raise urllib.error.HTTPError(request.full_url, 404, "Not found", None, None)
+        assert request.full_url == "https://api.github.com/repos/openai/codex/releases/assets/123"
+        assert request.headers.get("Authorization") == "Bearer test-only-token"
+        return io.BytesIO(b"archive bytes")
+
+    monkeypatch.setenv("GH_TOKEN", "test-only-token")
+    monkeypatch.setattr(
+        runtime_setup,
+        "_release_metadata",
+        lambda _: {"assets": [{"name": asset_name, "id": 123, "url": "http://127.0.0.1/private"}]},
+    )
+    monkeypatch.setattr(runtime_setup.urllib.request, "urlopen", fake_urlopen)
+
+    class Opener:
+        open = staticmethod(fake_urlopen)
+
+    monkeypatch.setattr(runtime_setup.urllib.request, "build_opener", lambda _: Opener())
+
+    archive = runtime_setup._download_release_archive("1.2.3", tmp_path)
+    assert archive.read_bytes() == b"archive bytes"
+    assert len(requests) == 2
+
+
+@pytest.mark.parametrize("asset_id", [None, "123", "../../private", True, -1, 0])
+def test_runtime_rejects_invalid_asset_ids_without_authenticated_request(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, asset_id: object
+) -> None:
+    runtime_setup = _load_runtime_setup_module()
+    requests: list[str] = []
+
+    def fake_urlopen(request):
+        requests.append(request.full_url)
+        raise urllib.error.HTTPError(request.full_url, 404, "Not found", None, None)
+
+    monkeypatch.setenv("GH_TOKEN", "test-only-token")
+    monkeypatch.setattr(
+        runtime_setup,
+        "_release_metadata",
+        lambda _: {
+            "assets": [
+                {
+                    "name": runtime_setup.platform_asset_name(),
+                    "id": asset_id,
+                    "url": "http://127.0.0.1/private",
+                }
+            ]
+        },
+    )
+    monkeypatch.setattr(runtime_setup.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(runtime_setup.shutil, "which", lambda _: None)
+
+    with pytest.raises(runtime_setup.RuntimeSetupError, match="Unable to download"):
+        runtime_setup._download_release_archive("1.2.3", tmp_path)
+    assert len(requests) == 1
+
+
+def test_runtime_asset_redirect_drops_api_credentials() -> None:
+    runtime_setup = _load_runtime_setup_module()
+    handler = runtime_setup._GitHubAssetRedirectHandler()
+    original = runtime_setup.urllib.request.Request(
+        "https://api.github.com/repos/openai/codex/releases/assets/123",
+        headers={"Authorization": "Bearer test-only-token"},
+    )
+    redirected = handler.redirect_request(
+        original, None, 302, "Found", {}, "https://release-assets.githubusercontent.com/archive"
+    )
+    assert redirected is not None
+    assert redirected.get_header("Authorization") is None
+    with pytest.raises(runtime_setup.RuntimeSetupError, match="HTTPS"):
+        handler.redirect_request(original, None, 302, "Found", {}, "http://example.com/archive")
