@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import argparse
+import ast
 import importlib
 import importlib.metadata
+import io
 import json
 import platform
 import re
@@ -11,6 +13,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import tokenize
 import types
 import typing
 from dataclasses import dataclass
@@ -572,6 +575,7 @@ def generate_v2_all(schema_dir: Path) -> None:
     with tempfile.TemporaryDirectory() as td:
         normalized_bundle = Path(td) / schema_bundle_path(schema_dir).name
         normalized_bundle.write_text(_normalized_schema_bundle_text(schema_dir))
+        definitions = json.loads(normalized_bundle.read_text()).get("definitions", {})
         run_python_module(
             "datamodel_code_generator",
             [
@@ -585,6 +589,8 @@ def generate_v2_all(schema_dir: Path) -> None:
                 "pydantic_v2.BaseModel",
                 "--target-python-version",
                 "3.11",
+                "--no-use-specialized-enum",
+                "--no-allow-remote-refs",
                 "--use-standard-collections",
                 "--enum-field-as-literal",
                 "one",
@@ -605,11 +611,56 @@ def generate_v2_all(schema_dir: Path) -> None:
             ],
             cwd=sdk_root(),
         )
+    public_names = set(definitions) | {
+        definition["title"]
+        for definition in definitions.values()
+        if isinstance(definition, dict) and isinstance(definition.get("title"), str)
+    }
+    _inline_literal_field_models(out_path, public_names)
     _require_nullable_chatgpt_account_email(out_path)
     _preserve_reasoning_effort_enum(out_path)
     _preserve_thread_source_enum(out_path)
     _preserve_plan_type_enum(out_path)
     _normalize_generated_timestamps(out_path)
+
+
+def _inline_literal_field_models(out_path: Path, public_names: set[str]) -> None:
+    """Keep inline discriminators as literals rather than new Pydantic wrapper objects."""
+    source = out_path.read_text()
+    helpers: dict[str, str] = {}
+    removed: set[int] = set()
+    for node in ast.parse(source).body:
+        if not isinstance(node, ast.ClassDef) or node.name in public_names or len(node.bases) != 1:
+            continue
+        base = node.bases[0]
+        if not (
+            isinstance(base, ast.Subscript)
+            and isinstance(base.value, ast.Name)
+            and base.value.id == "RootModel"
+            and isinstance(base.slice, ast.Subscript)
+            and isinstance(base.slice.value, ast.Name)
+            and base.slice.value.id == "Literal"
+        ):
+            continue
+        helpers[node.name] = ast.unparse(base.slice)
+        removed.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+    if not helpers:
+        return
+    source = "".join(
+        line
+        for number, line in enumerate(source.splitlines(keepends=True), 1)
+        if number not in removed
+    )
+    tokens = tokenize.generate_tokens(io.StringIO(source).readline)
+    out_path.write_text(
+        tokenize.untokenize(
+            token._replace(string=helpers[token.string])
+            if token.type == tokenize.NAME and token.string in helpers
+            else token
+            for token in tokens
+        )
+    )
+    run_python_module("ruff", ["format", str(out_path)], cwd=sdk_root())
 
 
 def _require_nullable_chatgpt_account_email(out_path: Path) -> None:
@@ -624,6 +675,8 @@ def _require_nullable_chatgpt_account_email(out_path: Path) -> None:
 
     class_source = source[class_start:class_end]
     nullable_with_default = "    email: str | None = None"
+    if "    email: str | None\n" in class_source:
+        return
     if class_source.count(nullable_with_default) != 1:
         raise RuntimeError(
             "Generated ChatgptAccount email did not have the expected nullable shape"

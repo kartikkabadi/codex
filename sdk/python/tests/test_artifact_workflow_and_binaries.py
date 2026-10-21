@@ -357,6 +357,67 @@ def test_generate_types_wires_all_generation_steps() -> None:
     ]
 
 
+def test_generator_upgrade_preserves_literal_fields_and_public_root_models(tmp_path: Path) -> None:
+    """New inline wrappers must not change the SDK's Python discriminator values."""
+    script = _load_update_script_module()
+    generated = tmp_path / "generated.py"
+    generated.write_text(
+        "from typing import Annotated, Literal\n"
+        "from pydantic import BaseModel, Field, RootModel\n\n"
+        'class InlineKind(RootModel[Literal["ok"]]):\n'
+        '    root: Literal["ok"]\n\n'
+        'class PublicKind(RootModel[Literal["public"]]):\n'
+        '    root: Literal["public"]\n\n'
+        "class PathValue(RootModel[str]):\n"
+        "    root: str\n\n"
+        "class Payload(BaseModel):\n"
+        '    kind: Annotated[InlineKind, Field(title="InlineKind")]\n'
+        "    public: PublicKind\n"
+        "    path: PathValue\n"
+    )
+    script._inline_literal_field_models(generated, {"PublicKind", "PathValue"})
+    spec = importlib.util.spec_from_file_location("generated_security_fixture", generated)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+        payload = module.Payload.model_validate({"kind": "ok", "public": "public", "path": "/tmp"})
+        assert payload.kind == "ok"
+        assert isinstance(payload.public, module.PublicKind)
+        assert isinstance(payload.path, module.PathValue)
+        assert payload.model_dump() == {"kind": "ok", "public": "public", "path": "/tmp"}
+        assert module.Payload.model_json_schema()["properties"]["kind"]["title"] == "InlineKind"
+        assert not hasattr(module, "InlineKind")
+    finally:
+        sys.modules.pop(spec.name, None)
+
+
+@pytest.mark.parametrize("annotation", ["str | None = None", "str | None"])
+def test_generator_upgrade_keeps_account_email_required_and_nullable(
+    tmp_path: Path, annotation: str
+) -> None:
+    """Both generator spellings must produce the same required nullable field."""
+    script = _load_update_script_module()
+    generated = tmp_path / "account.py"
+    generated.write_text(
+        "from pydantic import BaseModel\n\nclass ChatgptAccount(BaseModel):\n"
+        f"    email: {annotation}\n"
+    )
+    script._require_nullable_chatgpt_account_email(generated)
+    spec = importlib.util.spec_from_file_location("generated_account_fixture", generated)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+        assert module.ChatgptAccount(email=None).email is None
+        with pytest.raises(ValidationError):
+            module.ChatgptAccount()
+    finally:
+        sys.modules.pop(spec.name, None)
+
+
 def _load_runtime_schema_bundle(tmp_path: Path) -> dict:
     """Ask the pinned runtime package for a real schema bundle used by tests."""
     script = _load_update_script_module()
