@@ -12,6 +12,7 @@ import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
 _SDK_PYTHON_ROOT = str(Path(__file__).resolve().parent)
 if _SDK_PYTHON_ROOT not in sys.path:
@@ -29,6 +30,17 @@ REPO_SLUG = "openai/codex"
 
 class RuntimeSetupError(RuntimeError):
     pass
+
+
+class _GitHubAssetRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if urlsplit(newurl).scheme != "https":
+            raise RuntimeSetupError("GitHub asset redirects must use HTTPS.")
+        request = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if request is not None:
+            # Signed asset URLs do not need the GitHub API credential.
+            request.remove_header("Authorization")
+        return request
 
 
 def pinned_runtime_version() -> str:
@@ -207,9 +219,13 @@ def _download_release_archive(version: str, temp_root: Path) -> Path:
             f"Release {release_tag} does not contain asset {asset_name} for this platform."
         )
 
-    api_url = asset.get("url")
-    if not isinstance(api_url, str):
-        api_url = None
+    # Metadata must not choose where an authenticated request is sent.
+    asset_id = asset.get("id")
+    api_url = (
+        f"https://api.github.com/repos/{REPO_SLUG}/releases/assets/{asset_id}"
+        if type(asset_id) is int and asset_id > 0
+        else None
+    )
 
     if api_url is not None:
         token = _github_token()
@@ -220,7 +236,9 @@ def _download_release_archive(version: str, temp_root: Path) -> Path:
             )
             try:
                 with (
-                    urllib.request.urlopen(request) as response,
+                    urllib.request.build_opener(_GitHubAssetRedirectHandler()).open(
+                        request
+                    ) as response,
                     archive_path.open("wb") as fh,
                 ):
                     shutil.copyfileobj(response, fh)
